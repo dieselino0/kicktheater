@@ -160,23 +160,16 @@ opacity:0;
 </body>
 <script>
 // --- STATE VARIABLES ---
-// isPaused is our main flag. true = chat is paused, false = chat is auto-scrolling.
 let isPaused = false;
-// A flag to prevent pausing until there's enough content to scroll through.
 let hasEnoughContent = false;
-// For tracking touch gestures on mobile
-let touchStartY = 0;
+// Initialize it to the current position (likely 0).
+let lastScrollY = window.scrollY;
 
 // --- UTILITY FUNCTIONS ---
-/**
- * This function is called by the MutationObserver when the chat is paused.
- * It hides any new chat lines that are added to the DOM.
- */
 function hideNewChatLines(mutationsList) {
     mutationsList.forEach(mutation => {
         if (mutation.type === 'childList') {
             mutation.addedNodes.forEach(node => {
-                // Check if the added node is a new, animated chat line
                 if (node.nodeType === 1 && node.classList.contains('chat_line') && node.classList.contains('animate')) {
                     node.style.display = 'none';
                 }
@@ -185,9 +178,6 @@ function hideNewChatLines(mutationsList) {
     });
 }
 
-/**
- * Shows all chat lines that were previously hidden.
- */
 function showAllChatLines() {
     document.querySelectorAll('.chat_line.animate').forEach(element => {
         element.style.display = ''; // Reset display to its default
@@ -209,49 +199,39 @@ pauseButton.appendChild(img);
 pauseButton.appendChild(document.createTextNode('Chat Paused — Click to Resume'));
 pauseButton.style.position = 'fixed';
 pauseButton.style.bottom = '30px';
-pauseButton.style.left = '50%'; // Center the button
-pauseButton.style.transform = 'translateX(-50%)'; // Horizontally center
+pauseButton.style.left = '50%';
+pauseButton.style.transform = 'translateX(-50%)';
 pauseButton.style.fontSize = '18px';
 pauseButton.style.fontWeight = '600';
-pauseButton.style.width = 'auto'; // Auto-width based on content
-pauseButton.style.padding = '10px 20px'; // Add some padding
+pauseButton.style.width = 'auto';
+pauseButton.style.padding = '10px 20px';
 pauseButton.style.background = 'black';
 pauseButton.style.color = 'white';
-pauseButton.style.display = 'none'; // Initially hidden
+pauseButton.style.display = 'none';
 pauseButton.style.zIndex = '1000';
-pauseButton.style.borderRadius = '25px'; // Rounded corners
+pauseButton.style.borderRadius = '25px';
 pauseButton.style.border = '2px solid lime';
 pauseButton.style.cursor = 'pointer';
 document.body.appendChild(pauseButton);
 
 
 // --- CORE LOGIC FUNCTIONS ---
-/**
- * Pauses the chat: shows the button and starts observing for new messages to hide.
- */
 function pauseChat() {
-    // Don't do anything if already paused or not enough content
     if (isPaused || !hasEnoughContent) return;
     
     isPaused = true;
     pauseButton.style.display = 'block';
-    // Start observing the body for new child nodes to hide them
     observer.observe(document.body, { childList: true, subtree: true });
     console.log("Chat Paused.");
 }
 
-/**
- * Resumes the chat: hides button, stops observer, shows hidden messages, and scrolls to bottom.
- */
 function resumeChat() {
-    // Don't do anything if not paused
     if (!isPaused) return;
 
     isPaused = false;
     pauseButton.style.display = 'none';
-    observer.disconnect(); // Stop observing
-    showAllChatLines(); // Show any messages that were hidden
-    // Scroll to the very bottom smoothly
+    observer.disconnect();
+    showAllChatLines();
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
     console.log("Chat Resumed.");
 }
@@ -262,55 +242,48 @@ function resumeChat() {
 // When the user clicks the "resume" button
 pauseButton.addEventListener('click', resumeChat);
 
-// **THE KEY FIX**: Detect user's INTENT to scroll up
-// 1. For Mouse Wheel
-window.addEventListener('wheel', (event) => {
-    // event.deltaY < 0 means the user is scrolling UP.
-    if (event.deltaY < 0) {
-        pauseChat();
-    }
-}, { passive: true }); // Use passive listener for better scroll performance
-
-// 2. For Touch Devices
-window.addEventListener('touchstart', (event) => {
-    // Store the starting touch position
-    touchStartY = event.touches[0].clientY;
-}, { passive: true });
-
-window.addEventListener('touchmove', (event) => {
-    const currentY = event.touches[0].clientY;
-    // If the finger is moving down the screen, the content is scrolling UP.
-    if (currentY > touchStartY + 10) { // Add a small threshold
-        pauseChat();
-    }
-}, { passive: true });
-
-
-// This listener now ONLY handles RESUMING the chat when user scrolls back to the bottom.
+// The main scroll listener that handles both PAUSING and RESUMING
 window.addEventListener('scroll', () => {
-    // Check if there's enough content to enable the pause feature
+    // 1. First, check if there's enough content to enable the pause feature at all.
     if (!hasEnoughContent) {
         if (document.querySelectorAll('.chat_line.animate').length > 10) {
             hasEnoughContent = true;
         }
+        // Don't do anything else until there's enough content
+        return;
     }
 
-    // Check if the user has scrolled back to the bottom
-    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
+    const currentScrollY = window.scrollY;
 
+    // 2. CHECK FOR PAUSE: Did the user scroll UP?
+    // We check if the current scroll position is less than the last one we recorded.
+    // A small threshold (e.g., 5 pixels) prevents pausing on tiny scroll jitters.
+    if (currentScrollY < lastScrollY - 5) {
+        pauseChat();
+    }
+
+    // 3. CHECK FOR RESUME: Is the user back at the bottom?
+    // A 150px buffer makes it easy to get to the "bottom" on any device.
+    const isNearBottom = window.innerHeight + currentScrollY >= document.documentElement.scrollHeight - 150;
     if (isNearBottom) {
-        // If we were paused and are now at the bottom, resume.
-        if(isPaused) {
+        // If we were paused and are now at the bottom, resume the chat.
+        if (isPaused) {
             resumeChat();
         }
     }
-}, { passive: true });
+
+    // 4. IMPORTANT: Update the last scroll position for the next event.
+    lastScrollY = currentScrollY;
+
+}, { passive: true }); // Use passive listener for better scroll performance
 
 
 // --- AUTO-SCROLL INTERVAL ---
 // This interval keeps the chat scrolled to the bottom when it's not paused.
 setInterval(() => {
     if (!isPaused) {
+        // This scroll action will NOT trigger the pause because it only ever increases
+        // the scrollY value, it never decreases it.
         window.scrollTo(0, document.documentElement.scrollHeight);
     }
 }, 500);
