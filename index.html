@@ -163,9 +163,10 @@ opacity:0;
 let isPaused = false;
 let hasEnoughContent = false;
 let lastScrollY = window.scrollY;
+// A flag to ensure we only do the initial scroll ONCE.
+let initialScrollDone = false;
 
 // --- SETUP UI & ANCHOR ---
-
 // We create an invisible div at the end of the body.
 // This is our reliable target for scrolling to the bottom.
 const chatAnchor = document.createElement('div');
@@ -209,31 +210,26 @@ function pauseChat() {
 }
 
 function resumeChat() {
-    // No need to check if paused, as this is only called by user action
     isPaused = false;
     pauseButton.style.display = 'none';
 
-    // Show any messages that were hidden while paused
     document.querySelectorAll('.chat_line.animate[style*="display: none"]').forEach(element => {
         element.style.display = '';
     });
 
-    // Scroll smoothly to the anchor at the bottom
     chatAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
     console.log("Chat Resumed.");
 }
 
-// --- **IMPROVEMENT 1: EVENT-DRIVEN SCROLLING** ---
-// This single observer now handles both auto-scrolling AND hiding new messages.
+// --- MAIN OBSERVER FOR ALL CHAT LOGIC ---
 const chatObserver = new MutationObserver((mutationsList) => {
     let hasNewMessages = false;
     for (const mutation of mutationsList) {
         if (mutation.type === 'childList') {
             mutation.addedNodes.forEach(node => {
-                // Check if the added node is a chat line
                 if (node.nodeType === 1 && node.classList.contains('chat_line')) {
                     hasNewMessages = true;
-                    // If we're paused, hide the new message immediately.
+                    // If paused, hide the new message immediately.
                     if (isPaused) {
                         node.style.display = 'none';
                     }
@@ -242,21 +238,36 @@ const chatObserver = new MutationObserver((mutationsList) => {
         }
     }
 
-    // If new messages were added and we are NOT paused, scroll down.
-    if (hasNewMessages && !isPaused) {
+    // Only proceed if new chat lines were actually added.
+    if (!hasNewMessages) return;
+
+    // FIX FOR STARTUP SCROLL: If this is the first batch of messages,
+    // perform an instant scroll to the bottom and mark it as done.
+    if (!initialScrollDone) {
+        chatAnchor.scrollIntoView({ behavior: 'auto', block: 'end' }); // 'auto' is instant
+        initialScrollDone = true;
+        // IMPORTANT: Sync the scroll position after the initial jump.
+        lastScrollY = window.scrollY; 
+        return; // Exit after the initial scroll to avoid a double-scroll effect.
+    }
+    
+    // For all subsequent messages, scroll smoothly ONLY if not paused.
+    if (!isPaused) {
         chatAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 });
 
-// Start observing the entire body for changes. This observer is now ALWAYS on.
+// Start observing the entire body for new nodes.
 chatObserver.observe(document.body, { childList: true, subtree: true });
 
 
 // --- EVENT LISTENERS ---
 pauseButton.addEventListener('click', resumeChat);
 
-// The scroll listener now ONLY handles pausing and resuming. It doesn't fight an auto-scroller.
 window.addEventListener('scroll', () => {
+    // Don't do anything until the initial content has loaded and scrolled.
+    if (!initialScrollDone) return; 
+
     if (!hasEnoughContent && document.querySelectorAll('.chat_line.animate').length > 10) {
         hasEnoughContent = true;
     }
@@ -274,24 +285,16 @@ window.addEventListener('scroll', () => {
         resumeChat();
     }
 
-    // Always update the last scroll position
+    // Always update the last scroll position for the next event.
     lastScrollY = currentScrollY;
 }, { passive: true });
 
 // Handles user switching back to the tab
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && !isPaused) {
+    if (document.visibilityState === 'visible' && !isPaused && initialScrollDone) {
         chatAnchor.scrollIntoView({ behavior: 'auto', block: 'end' });
     }
 });
-
-
-// --- **IMPROVEMENT 2: INITIAL SCROLL ON LOAD** ---
-// After a very short delay to allow initial content to render,
-// scroll to the bottom to ensure the user starts in the right place.
-setTimeout(() => {
-    chatAnchor.scrollIntoView({ behavior: 'auto', block: 'end' });
-}, 100); // 100ms is a safe delay
 
 </script>
 </html>
