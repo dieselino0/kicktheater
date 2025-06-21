@@ -160,10 +160,10 @@ opacity:0;
 </body>
 <script>
 let isPaused = false;
-let readyToPause = false;
 let lastScrollY = window.scrollY;
 let scrollTimeout;
 
+// Observer to hide new messages while paused
 const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
         if (isPaused && mutation.type === 'childList') {
@@ -180,6 +180,7 @@ const observer = new MutationObserver(mutations => {
     });
 });
 
+// Pause button
 const pauseButton = document.createElement('button');
 const img = document.createElement("img");
 img.src = "./pause.jpg";
@@ -210,31 +211,26 @@ pauseButton.addEventListener('click', () => {
     scrollToBottom();
 });
 
-function scrollToBottom() {
-    window.scrollTo(0, document.documentElement.scrollHeight);
-}
-
+// Reveal hidden messages
 function revealHiddenMessages() {
     document.querySelectorAll('.chat_line.animate').forEach(el => {
         el.style.display = '';
     });
 }
 
-// Debounced scroll listener with relaxed threshold
+// Scroll to bottom
+function scrollToBottom() {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+}
+
+// Detect user scrolls
 window.addEventListener('scroll', () => {
     clearTimeout(scrollTimeout);
     scrollTimeout = setTimeout(() => {
-        const threshold = 200; // Relaxed bottom buffer
-        const scrollDelta = Math.abs(window.scrollY - lastScrollY);
-        const nearBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - threshold);
+        const threshold = 5; // Tight threshold for bottom detection
+        const scrollFromBottom = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
 
-        if (!readyToPause) {
-            if (document.querySelectorAll('.chat_line.animate').length > 10) {
-                readyToPause = true;
-            }
-        }
-
-        if (!nearBottom && readyToPause && scrollDelta > 2) {
+        if (scrollFromBottom > threshold) {
             if (!isPaused) {
                 isPaused = true;
                 pauseButton.style.display = 'block';
@@ -250,7 +246,7 @@ window.addEventListener('scroll', () => {
         }
 
         lastScrollY = window.scrollY;
-    }, 100); // Debounce delay
+    }, 100); // debounce
 });
 
 // Auto-scroll unless paused
