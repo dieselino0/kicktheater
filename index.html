@@ -159,32 +159,33 @@ opacity:0;
     </script>
 </body>
 <script>
-let index = false;
-let index2=false;
-	let interval,t;
-	let lastScrollY=window.innerHeight;
-	console.log('window.innerHeight=',window.innerHeight);
-	console.log('document.documentElement.scrollHeight=',document.documentElement.scrollHeight);
-	function hideNewChatLines(mutationsList) {
-    mutationsList.forEach(mutation => {
-        if (mutation.type === 'childList') {
+let isPaused = false;
+let readyToPause = false;
+let lastScrollY = window.scrollY;
+let scrollTimeout;
+
+const observer = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+        if (isPaused && mutation.type === 'childList') {
             mutation.addedNodes.forEach(node => {
-                if (node.nodeType === 1 && node.classList.contains('chat_line') && node.classList.contains('animate')) {
+                if (
+                    node.nodeType === 1 &&
+                    node.classList.contains('chat_line') &&
+                    node.classList.contains('animate')
+                ) {
                     node.style.display = 'none';
                 }
             });
         }
     });
-}
-const observer = new MutationObserver(hideNewChatLines);
-const pauseButton = document.createElement('button');
+});
 
+const pauseButton = document.createElement('button');
 const img = document.createElement("img");
 img.src = "./pause.jpg";
 img.style.verticalAlign = "middle"; 
 img.style.width = "21px";
 img.style.height = "21px";
-
 pauseButton.appendChild(img);
 pauseButton.appendChild(document.createTextNode(' Chat Paused for Scrolling'));
 pauseButton.style.position = 'fixed';
@@ -202,34 +203,60 @@ pauseButton.style.border = '2px solid lime';
 document.body.appendChild(pauseButton);
 
 pauseButton.addEventListener('click', () => {
-    index = false;
-	   window.scrollTo(0, document.documentElement.scrollHeight);
+    isPaused = false;
+    pauseButton.style.display = 'none';
+    observer.disconnect();
+    revealHiddenMessages();
+    scrollToBottom();
 });
-window.addEventListener('scroll', () => {
-if(!index2){
-if(document.querySelectorAll('.chat_line.animate').length > 10) index2=true;
+
+function scrollToBottom() {
+    window.scrollTo(0, document.documentElement.scrollHeight);
 }
-  if (window.scrollY + 150 < lastScrollY && index2) {
-        index = true;
-		pauseButton.style.display = 'block';
-observer.observe(document.body, { childList: true, subtree: true });
-    }
-	else {
-        const nearBottom =window.innerHeight+ window.scrollY >= document.documentElement.scrollHeight - 300;
-        if (nearBottom) {
-            index = false;
-			pauseButton.style.display = 'none';
-            observer.disconnect();
-			document.querySelectorAll('.chat_line.animate').forEach(element => {
-  element.style.display = '';
+
+function revealHiddenMessages() {
+    document.querySelectorAll('.chat_line.animate').forEach(el => {
+        el.style.display = '';
+    });
+}
+
+// Debounced scroll listener with relaxed threshold
+window.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+        const threshold = 200; // Relaxed bottom buffer
+        const scrollDelta = Math.abs(window.scrollY - lastScrollY);
+        const nearBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - threshold);
+
+        if (!readyToPause) {
+            if (document.querySelectorAll('.chat_line.animate').length > 10) {
+                readyToPause = true;
+            }
+        }
+
+        if (!nearBottom && readyToPause && scrollDelta > 2) {
+            if (!isPaused) {
+                isPaused = true;
+                pauseButton.style.display = 'block';
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
+        } else {
+            if (isPaused) {
+                isPaused = false;
+                pauseButton.style.display = 'none';
+                observer.disconnect();
+                revealHiddenMessages();
+            }
+        }
+
+        lastScrollY = window.scrollY;
+    }, 100); // Debounce delay
 });
-		}
-    }
-	    lastScrollY = window.scrollY;
-});
-interval = setInterval(() => {
-   if (!index) {
-   window.scrollTo(0, document.documentElement.scrollHeight);
+
+// Auto-scroll unless paused
+setInterval(() => {
+    if (!isPaused) {
+        scrollToBottom();
     }
 }, 500);
 </script>
