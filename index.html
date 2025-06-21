@@ -159,13 +159,15 @@ opacity:0;
     </script>
 </body>
 <script>
-let isPaused = false;
-let readyToPause = false;
-let lastScrollY = window.scrollY;
-
-const observer = new MutationObserver(mutations => {
-    mutations.forEach(mutation => {
-        if (isPaused && mutation.type === 'childList') {
+let index = false;
+let index2=false;
+	let interval,t;
+	let lastScrollY=window.innerHeight;
+	console.log('window.innerHeight=',window.innerHeight);
+	console.log('document.documentElement.scrollHeight=',document.documentElement.scrollHeight);
+	function hideNewChatLines(mutationsList) {
+    mutationsList.forEach(mutation => {
+        if (mutation.type === 'childList') {
             mutation.addedNodes.forEach(node => {
                 if (node.nodeType === 1 && node.classList.contains('chat_line') && node.classList.contains('animate')) {
                     node.style.display = 'none';
@@ -173,14 +175,16 @@ const observer = new MutationObserver(mutations => {
             });
         }
     });
-});
-
+}
+const observer = new MutationObserver(hideNewChatLines);
 const pauseButton = document.createElement('button');
+
 const img = document.createElement("img");
 img.src = "./pause.jpg";
 img.style.verticalAlign = "middle"; 
 img.style.width = "21px";
 img.style.height = "21px";
+
 pauseButton.appendChild(img);
 pauseButton.appendChild(document.createTextNode(' Chat Paused for Scrolling'));
 pauseButton.style.position = 'fixed';
@@ -198,57 +202,35 @@ pauseButton.style.border = '2px solid lime';
 document.body.appendChild(pauseButton);
 
 pauseButton.addEventListener('click', () => {
-    isPaused = false;
-    pauseButton.style.display = 'none';
-    observer.disconnect();
-    revealHiddenMessages();
-    scrollToBottom();
+    index = false;
+	   window.scrollTo(0, document.documentElement.scrollHeight);
 });
-
-function scrollToBottom() {
-    window.scrollTo(0, document.documentElement.scrollHeight);
-}
-
-function revealHiddenMessages() {
-    document.querySelectorAll('.chat_line.animate').forEach(el => {
-        el.style.display = '';
-    });
-}
-
-// Detect scroll to toggle paused state
 window.addEventListener('scroll', () => {
-    const nearBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100);
-
-    if (!readyToPause) {
-        // Only start pausing once enough messages are present
-        if (document.querySelectorAll('.chat_line.animate').length > 10) {
-            readyToPause = true;
-        }
+if(!index2){
+if(document.querySelectorAll('.chat_line.animate').length > 10) index2=true;
+}
+  if (window.scrollY + 150 < lastScrollY && index2) {
+        index = true;
+		pauseButton.style.display = 'block';
+observer.observe(document.body, { childList: true, subtree: true });
     }
-
-    if (!nearBottom && readyToPause) {
-        if (!isPaused) {
-            isPaused = true;
-            pauseButton.style.display = 'block';
-            observer.observe(document.body, { childList: true, subtree: true });
-        }
-    } else {
-        if (isPaused) {
-            isPaused = false;
-            pauseButton.style.display = 'none';
+	else {
+        const nearBottom =window.innerHeight+ window.scrollY >= document.documentElement.scrollHeight - 300;
+        if (nearBottom) {
+            index = false;
+			pauseButton.style.display = 'none';
             observer.disconnect();
-            revealHiddenMessages();
-        }
-    }
-
-    lastScrollY = window.scrollY;
+			document.querySelectorAll('.chat_line.animate').forEach(element => {
+  element.style.display = '';
 });
-
-// Keep scrolling to bottom unless paused
-setInterval(() => {
-    if (!isPaused) {
-        scrollToBottom();
+		}
     }
-}, 50);
+	    lastScrollY = window.scrollY;
+});
+interval = setInterval(() => {
+   if (!index) {
+   window.scrollTo(0, document.documentElement.scrollHeight);
+    }
+}, 500);
 </script>
 </html>
