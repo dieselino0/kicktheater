@@ -162,7 +162,6 @@ opacity:0;
 // --- STATE VARIABLES ---
 let isPaused = false;
 let hasEnoughContent = false;
-// Initialize it to the current position (likely 0).
 let lastScrollY = window.scrollY;
 
 // --- UTILITY FUNCTIONS ---
@@ -180,13 +179,14 @@ function hideNewChatLines(mutationsList) {
 
 function showAllChatLines() {
     document.querySelectorAll('.chat_line.animate').forEach(element => {
-        element.style.display = ''; // Reset display to its default
+        element.style.display = '';
     });
 }
 
-// --- SETUP THE PAUSE BUTTON AND OBSERVER ---
+// --- SETUP UI ELEMENTS ---
 const observer = new MutationObserver(hideNewChatLines);
 
+// The "Chat Paused" button
 const pauseButton = document.createElement('button');
 const img = document.createElement("img");
 img.src = "./pause.jpg"; // Make sure this path is correct
@@ -197,6 +197,7 @@ img.style.marginRight = "10px";
 
 pauseButton.appendChild(img);
 pauseButton.appendChild(document.createTextNode('Chat Paused — Click to Resume'));
+// ... (styling is the same as before)
 pauseButton.style.position = 'fixed';
 pauseButton.style.bottom = '30px';
 pauseButton.style.left = '50%';
@@ -215,10 +216,17 @@ pauseButton.style.cursor = 'pointer';
 document.body.appendChild(pauseButton);
 
 
+// **IMPROVEMENT 1: SMOOTH SCROLL ANCHOR**
+// We create an invisible div at the end of the body.
+// Scrolling to this element is smoother and more reliable than calculating the height.
+const chatAnchor = document.createElement('div');
+chatAnchor.id = 'chat-anchor';
+document.body.appendChild(chatAnchor);
+
+
 // --- CORE LOGIC FUNCTIONS ---
 function pauseChat() {
     if (isPaused || !hasEnoughContent) return;
-    
     isPaused = true;
     pauseButton.style.display = 'block';
     observer.observe(document.body, { childList: true, subtree: true });
@@ -227,66 +235,74 @@ function pauseChat() {
 
 function resumeChat() {
     if (!isPaused) return;
-
     isPaused = false;
     pauseButton.style.display = 'none';
     observer.disconnect();
     showAllChatLines();
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+    // Scroll smoothly to the anchor at the bottom
+    chatAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
     console.log("Chat Resumed.");
 }
 
 
 // --- EVENT LISTENERS ---
-
-// When the user clicks the "resume" button
 pauseButton.addEventListener('click', resumeChat);
 
-// The main scroll listener that handles both PAUSING and RESUMING
 window.addEventListener('scroll', () => {
-    // 1. First, check if there's enough content to enable the pause feature at all.
-    if (!hasEnoughContent) {
-        if (document.querySelectorAll('.chat_line.animate').length > 10) {
-            hasEnoughContent = true;
-        }
-        // Don't do anything else until there's enough content
-        return;
+    // Enable the pause feature only after 10 messages have appeared
+    if (!hasEnoughContent && document.querySelectorAll('.chat_line.animate').length > 10) {
+        hasEnoughContent = true;
     }
 
     const currentScrollY = window.scrollY;
-
-    // 2. CHECK FOR PAUSE: Did the user scroll UP?
-    // We check if the current scroll position is less than the last one we recorded.
-    // A small threshold (e.g., 5 pixels) prevents pausing on tiny scroll jitters.
-    if (currentScrollY < lastScrollY - 5) {
+    
+    // PAUSE: If user scrolls up, call pauseChat()
+    if (currentScrollY < lastScrollY - 10) { // 10px threshold
         pauseChat();
     }
 
-    // 3. CHECK FOR RESUME: Is the user back at the bottom?
-    // A 150px buffer makes it easy to get to the "bottom" on any device.
-    const isNearBottom = window.innerHeight + currentScrollY >= document.documentElement.scrollHeight - 150;
-    if (isNearBottom) {
-        // If we were paused and are now at the bottom, resume the chat.
-        if (isPaused) {
-            resumeChat();
-        }
+    // RESUME: If user scrolls back to the very bottom, call resumeChat()
+    const isAtBottom = window.innerHeight + currentScrollY >= document.documentElement.scrollHeight - 10;
+    if (isAtBottom && isPaused) {
+        resumeChat();
     }
 
-    // 4. IMPORTANT: Update the last scroll position for the next event.
+    // Always update the last scroll position
     lastScrollY = currentScrollY;
+}, { passive: true });
 
-}, { passive: true }); // Use passive listener for better scroll performance
 
-
-// --- AUTO-SCROLL INTERVAL ---
-// This interval keeps the chat scrolled to the bottom when it's not paused.
-setInterval(() => {
-    if (!isPaused) {
-        // This scroll action will NOT trigger the pause because it only ever increases
-        // the scrollY value, it never decreases it.
-        window.scrollTo(0, document.documentElement.scrollHeight);
+// **IMPROVEMENT 2: DON'T PAUSE ON TAB CHANGE**
+// Use the Page Visibility API to handle the user switching tabs.
+document.addEventListener('visibilitychange', () => {
+    // If the tab becomes visible again AND the chat is not manually paused...
+    if (document.visibilityState === 'visible' && !isPaused) {
+        console.log("Tab is visible again. Catching up...");
+        // Instantly scroll to the bottom to show all missed messages.
+        // 'auto' behavior is instant, which is what we want for a catch-up.
+        chatAnchor.scrollIntoView({ behavior: 'auto', block: 'end' });
     }
-}, 500);
+});
+
+
+// **IMPROVEMENT 3: SMART, SMOOTH AUTO-SCROLL**
+// Replaces the jerky setInterval with a smooth, efficient animation loop.
+function smartAutoScroll() {
+    // Check if we should be auto-scrolling
+    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
+
+    // ONLY scroll if the chat is NOT paused AND the user is already near the bottom.
+    // This stops the scroll from fighting the user when they try to scroll up.
+    if (!isPaused && isNearBottom) {
+        chatAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    // Keep the loop running
+    requestAnimationFrame(smartAutoScroll);
+}
+
+// Start the smart scroll loop
+requestAnimationFrame(smartAutoScroll);
 
 </script>
 </html>
