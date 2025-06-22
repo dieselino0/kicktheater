@@ -259,13 +259,10 @@ function main(channelId) {
             document.getElementById('loading').style.display = 'none';
         }, 2000);
 
-        // --- THIS IS THE CRITICAL FIX ---
-        // The correct channel format for public chatrooms
         const channelToSubscribe = `chatrooms.${channelId}.v2`; 
         
         console.log(`Subscribing to: ${channelToSubscribe}`);
 
-        // Send the subscription message for a PUBLIC channel (no 'auth' key needed)
         socket.send(JSON.stringify({
             event: 'pusher:subscribe',
             data: {
@@ -274,17 +271,13 @@ function main(channelId) {
         }));
     };
 
+    // --- THIS IS THE CRITICAL FIX ---
     socket.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        
-        // You can add a check here to see if the subscription was successful
-        if (message.event === 'pusher_internal:subscription_succeeded') {
-            console.log(`Successfully subscribed to channel: ${message.channel}`);
-        } else {
-             // Pass all other messages to the parser
-             parseMessage(event.data);
-        }
+        // Simply pass ALL incoming data to the parser.
+        // The parser function will know how to handle different event types.
+        parseMessage(event.data);
     };
+    // --- END OF FIX ---
 
     socket.onerror = (error) => {
         console.error(`WebSocket Error:`, error);
@@ -314,7 +307,7 @@ function main(channelId) {
 function parseMessage(rawData) {
     const message = JSON.parse(rawData);
 
-    // FIX: Handle both stringified JSON (from Kick) and direct JSON objects (from standard Pusher backends).
+    // FIX: Handle stringified JSON data from Kick
     let eventData;
     if (typeof message.data === 'string') {
         eventData = JSON.parse(message.data);
@@ -324,8 +317,11 @@ function parseMessage(rawData) {
     
     // Route based on Kick's event names
     switch (message.event) {
+        case 'pusher_internal:subscription_succeeded':
+            console.log(`Successfully subscribed to channel: ${message.channel}`);
+            break;
         case 'App\\Events\\ChatMessageEvent':
-            console.log("Message:", eventData);
+            // console.log("Message:", eventData); // You can uncomment this for debugging
             handleMessage(eventData);
             break;
         case 'App\\Events\\MessageDeletedEvent':
@@ -341,7 +337,7 @@ function parseMessage(rawData) {
             handleClear(eventData);
             break;
         default:
-             // Ignore pusher-internal events and any others we don't care about
+            // Ignore other pusher-internal events and any others we don't care about
             if (!message.event.startsWith('pusher')) {
                 console.log("Received unhandled event:", message.event);
             }
@@ -382,8 +378,6 @@ function handleMessage(messageData) {
     // Create the message container element
     let messageElement = document.createElement('div');
     
-    // --- THIS IS THE SECONDARY FIX ---
-    // Use 'chat_line' to match the pause-on-scroll script and add 'animate' class for entry animation
     messageElement.classList.add('chat_line');
     if (animate) {
         messageElement.classList.add('animate');
@@ -450,8 +444,6 @@ function handleMessage(messageData) {
     // Add the message to the chat container
     const chatContainer = document.getElementById('chat-container');
     chatContainer.appendChild(messageElement);
-
-    // Scroll to the bottom (This will be handled by the pause-on-scroll script's observer)
 
     // Limit the number of messages on screen to 100 to avoid performance issues
     let messages = document.querySelectorAll('.chat_line');
