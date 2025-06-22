@@ -45,7 +45,7 @@
 }
 #loading
 {
-opacity:0;
+opacity:1; /* Make it visible by default */
 }
         @-webkit-keyframes fadeInUp {
             from {
@@ -88,7 +88,7 @@ opacity:0;
             }
         }
 
-        .fade {
+        .fade-out { /* Changed from .fade to be more specific */
             animation-duration: 0.5s;
             animation-fill-mode: both;
             -webkit-animation-duration: 0.5s;
@@ -117,11 +117,11 @@ opacity:0;
             line-height: 30px;
         }
 
-        .user_info {
+        .sender-info {
             display: inline-block;
         }
 
-        .colon {
+        .separator {
             margin-right: 8px;
         }
 
@@ -243,58 +243,69 @@ async function getChannelInfo() {
  * @param {string} channelId - The ID of the chatroom to connect to.
  */
 function main(channelId) {
-    // --- User-Provided Pusher Credentials ---
+    // --- Kick's Public Pusher Credentials ---
     const key = "4912e76426d255ae4a90";
     const cluster = "us2";
-    // The 'app_id' and 'secret' are for server-side use only and are not used here.
-    // Exposing your 'secret' in client-side code is a major security risk.
 
-    // Establish WebSocket connection using your credentials
+    // Establish WebSocket connection
     const socket = new WebSocket(`wss://ws-${cluster}.pusher.com/app/${key}?protocol=7&client=js&version=7.6.0&flash=false`);
 
-    console.log("WebSocket connection initiated to your custom Pusher instance.");
-    console.log(socket);
+    console.log("WebSocket connection initiated to Kick's Pusher instance.");
 
     socket.onopen = () => {
-        console.log("Connected to your Pusher instance.");
-        document.getElementById('loading').innerHTML = '<img src="https://files.kick.com/emotes/26/full/2x.png" class="badge gift"></img> Connected to custom Pusher';
+        console.log("WebSocket Connected. Subscribing to channel...");
+        document.getElementById('loading').innerHTML = '<img src="https://files.kick.com/emotes/26/full/2x.png" class="badge gift"></img> Connected to Kick Chat';
         setTimeout(() => {
             document.getElementById('loading').style.display = 'none';
-        }, 1000);
+        }, 2000);
+
+        // --- THIS IS THE CRITICAL FIX ---
+        // The correct channel format for public chatrooms
+        const channelToSubscribe = `chatrooms.${channelId}.v2`; 
         
-        // IMPORTANT: This now subscribes to a channel on YOUR Pusher app.
-        // You must have a backend server using your App ID and Secret to push events to this channel.
-        const channelToSubscribe = `private-chat-channel-${channelId}`; // Example channel name
-        
+        console.log(`Subscribing to: ${channelToSubscribe}`);
+
+        // Send the subscription message for a PUBLIC channel (no 'auth' key needed)
         socket.send(JSON.stringify({
             event: 'pusher:subscribe',
             data: {
-                auth: '', // NOTE: Private channels require a server-side authentication signature.
                 channel: channelToSubscribe
             }
         }));
     };
 
     socket.onmessage = (event) => {
-        parseMessage(event.data);
+        const message = JSON.parse(event.data);
+        
+        // You can add a check here to see if the subscription was successful
+        if (message.event === 'pusher_internal:subscription_succeeded') {
+            console.log(`Successfully subscribed to channel: ${message.channel}`);
+        } else {
+             // Pass all other messages to the parser
+             parseMessage(event.data);
+        }
     };
 
     socket.onerror = (error) => {
-        console.log(`Error: ${error}`);
+        console.error(`WebSocket Error:`, error);
     };
 
-    socket.onclose = () => {
-        console.log("Connection closed.");
+    socket.onclose = (event) => {
+        console.log("WebSocket Connection Closed. Code:", event.code, "Reason:", event.reason);
+        // You might want to add reconnection logic here.
     };
 
     // Keep the connection alive by sending a ping every 25 seconds
     setInterval(() => {
-        socket.send(JSON.stringify({
-            event: 'pusher:ping',
-            data: {}
-        }));
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                event: 'pusher:ping',
+                data: {}
+            }));
+        }
     }, 25000);
 }
+
 
 /**
  * Parses incoming WebSocket messages and routes them to the correct handler.
@@ -311,31 +322,30 @@ function parseMessage(rawData) {
         eventData = message.data;
     }
     
-    if (message.event.startsWith('pusher')) {
-        // Pusher-internal events, can be ignored.
-    } else if (message.event === 'App\\Events\\ChatMessageEvent') {
-        console.log("Message:", eventData);
-        handleMessage(eventData);
-    } else if (message.event === 'App\\Events\\MessageDeletedEvent') {
-        console.log("Deleted:", eventData);
-        handleDelete(eventData);
-    } else if (message.event === 'App\\Events\\UserBannedEvent') {
-        console.log("Banned:", eventData);
-        handleBan(eventData);
-    } else if (message.event === 'App\\Events\\ChatClearEvent') {
-        console.log("Chat Cleared");
-        handleClear(eventData);
-    } else {
-        // Handle custom events from your own backend here
-        console.log("Received custom event:", message.event);
-        console.log("Data:", eventData);
-        
-        // Example: If your backend sends a standard message, you can route it
-        // This assumes your backend sends an event named 'client-chat-message'
-        // with a data structure similar to Kick's.
-        if (message.event === 'client-chat-message') {
-             handleMessage(eventData);
-        }
+    // Route based on Kick's event names
+    switch (message.event) {
+        case 'App\\Events\\ChatMessageEvent':
+            console.log("Message:", eventData);
+            handleMessage(eventData);
+            break;
+        case 'App\\Events\\MessageDeletedEvent':
+            console.log("Deleted:", eventData);
+            handleDelete(eventData);
+            break;
+        case 'App\\Events\\UserBannedEvent':
+            console.log("Banned:", eventData);
+            handleBan(eventData);
+            break;
+        case 'App\\Events\\ChatClearEvent':
+            console.log("Chat Cleared");
+            handleClear(eventData);
+            break;
+        default:
+             // Ignore pusher-internal events and any others we don't care about
+            if (!message.event.startsWith('pusher')) {
+                console.log("Received unhandled event:", message.event);
+            }
+            break;
     }
 }
 
@@ -351,9 +361,10 @@ function handleMessage(messageData) {
     let content = messageData.content;
     const username = messageData.sender.username;
     const identity = messageData.sender.identity;
+    const senderId = messageData.sender.id; // Get sender ID for ban handling
 
-    if (hideCommands === 'true') {
-        if (content.startsWith('!')) return;
+    if (hideCommands === 'true' && content.startsWith('!')) {
+        return;
     }
     if (hideBots === 'true') {
         const bots = ['nightbot', 'botrix', 'botrixlive', 'streamlabs'];
@@ -361,30 +372,26 @@ function handleMessage(messageData) {
     }
 
     // Replace emote codes with image tags
-    const emoteRegex = /\[emote:(\d+):?([\w\s\-~!@#$%^&*()_+=\{}\\|;:'",.<>\/?]+)\]/g;
-    const emoteMatches = content.match(emoteRegex);
-    if (emoteMatches) {
-        for (const emote of emoteMatches) {
-            const emoteId = emote.match(/\[emote:(\d+):?/)[1];
-            content = content.replace(emote, `<img src="https://files.kick.com/emotes/${emoteId}/full/2x.gif" class="emote">`);
-        }
-    }
+    content = content.replace(/\[emote:(\d+):?([\w\s\-~!@#$%^&*()_+=\{}\\|;:'",.<>\/?]+)\]/g, 
+        '<img src="https://files.kick.com/emotes/$1/full/2x.gif" class="emote">');
 
     // Replace emoji codes with image tags
-    const emojiRegex = /\[emoji:(\w+)\]/g;
-    const emojiMatches = content.match(emojiRegex);
-    if (emojiMatches) {
-        for (const emoji of emojiMatches) {
-            const emojiId = emoji.match(/\[emoji:(\w+)\]/)[1];
-            content = content.replace(emoji, `<img src="https://files.kick.com/emojis/${emojiId}.png" class="emote">`);
-        }
-    }
+    content = content.replace(/\[emoji:(\w+)\]/g, 
+        '<img src="https://files.kick.com/emojis/$1.png" class="emote">');
 
     // Create the message container element
     let messageElement = document.createElement('div');
-    messageElement.classList.add('message-line');
+    
+    // --- THIS IS THE SECONDARY FIX ---
+    // Use 'chat_line' to match the pause-on-scroll script and add 'animate' class for entry animation
+    messageElement.classList.add('chat_line');
+    if (animate) {
+        messageElement.classList.add('animate');
+    }
+    
     messageElement.setAttribute('data-id', messageId);
     messageElement.setAttribute('data-sender', username);
+    messageElement.setAttribute('data-sender-id', senderId); // Set sender ID attribute
     messageElement.setAttribute('data-timestamp', messageData.created_at);
 
     // Create container for badges and username
@@ -419,7 +426,7 @@ function handleMessage(messageData) {
     contentElement.innerHTML = content;
 
     // Apply text color and size if specified
-    if (textColor) {
+    if (textColor && textColor !== '#') {
         contentElement.style.color = textColor;
     }
     if (textSize) {
@@ -429,11 +436,6 @@ function handleMessage(messageData) {
     // Assemble the full message element
     messageElement.appendChild(senderInfoElement);
     messageElement.appendChild(contentElement);
-
-    // Animate message entry
-    if (animate) {
-        messageElement.classList.add('hidden');
-    }
 
     // Fade out message after a delay
     if (fade) {
@@ -449,12 +451,11 @@ function handleMessage(messageData) {
     const chatContainer = document.getElementById('chat-container');
     chatContainer.appendChild(messageElement);
 
-    // Scroll to the bottom
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Scroll to the bottom (This will be handled by the pause-on-scroll script's observer)
 
     // Limit the number of messages on screen to 100 to avoid performance issues
-    let messages = document.querySelectorAll('.message-line');
-    if (messages.length > 100) {
+    let messages = document.querySelectorAll('.chat_line');
+    if (messages.length > 100 && !fade) { // Only remove if not using fade
         messages[0].remove();
     }
 }
@@ -502,43 +503,40 @@ function generateBadges(messageData) {
 
     badges.forEach(badge => {
         const badgeType = badge.type;
-        console.log(`Badge found: ${badgeType}`);
-        console.log(badge);
-
         switch (badgeType) {
             case 'broadcaster':
-                badgesHtml += '<img src="https://files.kick.com/static/badges/broadcaster.svg" class="badge broadcaster"></img>';
+                badgesHtml += '<img src="https://files.kick.com/static/badges/broadcaster.svg" class="badge broadcaster">';
                 break;
             case 'moderator':
-                badgesHtml += '<img src="https://files.kick.com/static/badges/moderator.svg" class="badge moderator"></img>';
+                badgesHtml += '<img src="https://files.kick.com/static/badges/moderator.svg" class="badge moderator">';
                 break;
             case 'vip':
-                badgesHtml += `<img src="https://files.kick.com/static/badges/vip.png" class="badge vip" style="--badge-color: ${badge.data.color};"></img>`;
+                badgesHtml += `<img src="https://files.kick.com/static/badges/vip.png" class="badge vip" style="--badge-color: ${badge.data.color};">`;
                 break;
             case 'og':
-                badgesHtml += '<img src="https://files.kick.com/static/badges/og.svg" class="badge OG"></img>';
+                badgesHtml += '<img src="https://files.kick.com/static/badges/og.svg" class="badge OG">';
                 break;
             case 'subscriber':
                 if (subBadges) {
                     const months = parseInt(badge.count);
                     const bestBadge = subBadges.find(b => b.months === months) || subBadges.find(b => b.months < months);
                     if (bestBadge) {
-                        badgesHtml += `<img src="${bestBadge.badge_image.src}" class="badge subscriber"></img>`;
+                        badgesHtml += `<img src="${bestBadge.badge_image.src}" class="badge subscriber">`;
                     }
                 }
                 break;
             case 'sub_gifter':
                 const giftCount = parseInt(badge.count);
                 if (giftCount >= 50) {
-                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v5.svg" class="badge subgift"></img>';
+                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v5.svg" class="badge subgift">';
                 } else if (giftCount >= 25) {
-                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v4.svg" class="badge subgift"></img>';
+                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v4.svg" class="badge subgift">';
                 } else if (giftCount >= 10) {
-                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v3.svg" class="badge subgift"></img>';
+                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v3.svg" class="badge subgift">';
                 } else if (giftCount >= 5) {
-                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v2.svg" class="badge subgift"></img>';
+                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v2.svg" class="badge subgift">';
                 } else if (giftCount >= 1) {
-                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v1.svg" class="badge subgift"></img>';
+                    badgesHtml += '<img src="https://files.kick.com/static/badges/sub_gifter/v1.svg" class="badge subgift">';
                 }
                 break;
         }
@@ -557,13 +555,13 @@ getChannelInfo().then(channelId => {
 </script>
 </body>
 <script>
+    // --- PAUSE ON SCROLL SCRIPT ---
+
     // The chat won't pause until at least this many messages exist.
     const MIN_MESSAGES_TO_PAUSE = 10;
 
     // --- STATE VARIABLES ---
-    // isPaused: Our single source of truth. true = user has scrolled up, false = auto-scrolling.
     let isPaused = false;
-    // lastScrollY: Tracks the last scroll position to detect scroll direction.
     let lastScrollY = window.scrollY;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
@@ -584,6 +582,7 @@ getChannelInfo().then(channelId => {
         left: '50%',
         transform: 'translateX(-50%)',
         width: '80%',
+        maxWidth: '400px', // Set a max width
         padding: '10px 20px',
         fontSize: '18px',
         fontWeight: '600',
@@ -594,7 +593,8 @@ getChannelInfo().then(channelId => {
         borderRadius: '25px',
         border: '2px solid #00ff00', // Lime green
         cursor: 'pointer',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        textAlign: 'center'
     });
     document.body.appendChild(pauseButton);
 
@@ -602,14 +602,14 @@ getChannelInfo().then(channelId => {
     // --- FUNCTIONS ---
 
     /**
-     * Resumes the chat, hiding the pause button, showing all messages, and scrolling to the bottom.
+     * Resumes the chat, hiding the pause button and scrolling to the bottom.
      */
     function resumeChat() {
         isPaused = false;
         pauseButton.style.display = 'none';
 
         // Show any messages that were hidden while paused
-        document.querySelectorAll('.chat_line.animate[data-hidden="true"]').forEach(element => {
+        document.querySelectorAll('.chat_line[data-hidden="true"]').forEach(element => {
             element.style.display = '';
             element.removeAttribute('data-hidden');
         });
@@ -621,26 +621,23 @@ getChannelInfo().then(channelId => {
         });
         
         // After scrolling, update lastScrollY to the new bottom position
-        // Use a small delay to allow the scroll to complete
         setTimeout(() => {
             lastScrollY = window.scrollY;
-        }, 300); // 300ms should be enough for a smooth scroll
+        }, 300); 
     }
 
     /**
-     * This function is the heart of the auto-scroll and pause logic.
-     * It's called by the MutationObserver whenever the chat content changes.
+     * Handles updates to the chat container, hiding new messages if paused,
+     * or auto-scrolling if not.
      */
     function handleChatUpdate(mutationsList) {
         let hasNewMessage = false;
         for (const mutation of mutationsList) {
             if (mutation.type === 'childList') {
                 for (const node of mutation.addedNodes) {
-                    // Check if the added node is a new chat line we care about
-                    if (node.nodeType === 1 && node.classList.contains('chat_line') && node.classList.contains('animate')) {
+                    if (node.nodeType === 1 && node.classList.contains('chat_line')) {
                         hasNewMessage = true;
                         if (isPaused) {
-                            // If paused, hide the new message and mark it
                             node.style.display = 'none';
                             node.setAttribute('data-hidden', 'true');
                         }
@@ -649,70 +646,56 @@ getChannelInfo().then(channelId => {
             }
         }
 
-        // If new messages arrived AND we are not paused, scroll to the bottom.
         if (hasNewMessage && !isPaused) {
             window.scrollTo(0, document.documentElement.scrollHeight);
-            // After auto-scrolling, update our last known position to the new bottom.
             lastScrollY = document.documentElement.scrollHeight - window.innerHeight;
         }
     }
 
 
     /**
-     * Checks the user's scroll direction to determine if the chat should be paused.
-     * It also checks if the user has scrolled back to the very bottom to resume.
+     * Checks scroll direction to determine if the chat should pause or resume.
      */
     function checkScrollPosition() {
-        const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
-        if (chatLineCount < MIN_MESSAGES_TO_PAUSE) {
-            return; // Don't allow pausing if chat is too short
+        if (document.querySelectorAll('.chat_line').length < MIN_MESSAGES_TO_PAUSE) {
+            return; 
         }
 
         const currentScrollY = window.scrollY;
         
-        // --- PAUSE LOGIC ---
-        // If the user scrolls UP (and we aren't already paused), pause the chat.
-        // We add a small buffer (currentScrollY > 0) to avoid issues at the very top.
+        // PAUSE: If scrolled UP and not already paused.
         if (currentScrollY < lastScrollY && !isPaused && currentScrollY > 0) {
             isPaused = true;
             pauseButton.style.display = 'block';
         }
 
-        // --- RESUME LOGIC ---
-        // If the user scrolls all the way to the bottom, resume the chat.
-        const isAtVeryBottom = (window.innerHeight + currentScrollY) >= document.documentElement.scrollHeight;
+        // RESUME: If scrolled to the very bottom.
+        const isAtVeryBottom = (window.innerHeight + currentScrollY) >= document.documentElement.scrollHeight - 5; // 5px buffer
         if (isAtVeryBottom && isPaused) {
             resumeChat();
         }
 
-        // ALWAYS update the last scroll position for the next check.
         lastScrollY = currentScrollY;
     }
 
 
     // --- SETUP OBSERVERS AND EVENT LISTENERS ---
-
-    // Create and start the MutationObserver to watch for new messages
+    const chatContainer = document.getElementById('chat-container');
     const observer = new MutationObserver(handleChatUpdate);
-    observer.observe(document.body, {
+    observer.observe(chatContainer, {
         childList: true,
-        subtree: true
     });
 
-    // When the pause button is clicked, resume the chat.
     pauseButton.addEventListener('click', resumeChat);
 
-    // Use a timeout to prevent the scroll check from running too frequently
     let scrollTimeout;
     window.addEventListener('scroll', () => {
         clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(checkScrollPosition, 50); // Check 50ms after the last scroll event
+        scrollTimeout = setTimeout(checkScrollPosition, 50);
     });
 
     // --- INITIAL SCROLL ---
-    // Start scrolled to the bottom when the page loads.
     window.scrollTo(0, document.documentElement.scrollHeight);
-    // Initialize our last scroll position correctly after the initial scroll.
     lastScrollY = window.scrollY;
 
 </script>
