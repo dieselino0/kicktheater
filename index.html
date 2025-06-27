@@ -163,24 +163,6 @@ opacity:0;
     let isPaused = false;
     let lastScrollY = window.scrollY;
 
-    // Track if user actually scrolled manually
-    let userScrolledManually = false;
-    let manualScrollTimer;
-
-    function registerManualScroll() {
-        userScrolledManually = true;
-        clearTimeout(manualScrollTimer);
-        manualScrollTimer = setTimeout(() => userScrolledManually = false, 300);
-    }
-
-    // Listen for genuine user interactions
-    window.addEventListener('wheel', registerManualScroll);
-    window.addEventListener('touchmove', registerManualScroll);
-    window.addEventListener('keydown', (e) => {
-        const keys = ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '];
-        if (keys.includes(e.key)) registerManualScroll();
-    });
-
     // Create the "Chat Paused" button
     const pauseButton = document.createElement('button');
     const img = document.createElement("img");
@@ -215,6 +197,7 @@ opacity:0;
         isPaused = false;
         pauseButton.style.display = 'none';
 
+        // Show hidden messages when resumed
         document.querySelectorAll('.chat_line.animate[data-hidden="true"]').forEach(el => {
             el.style.display = '';
             el.removeAttribute('data-hidden');
@@ -245,28 +228,27 @@ opacity:0;
         }
     }
 
+    // New checkScrollPosition logic:
+    // Pause if scroll is away from bottom in any way, resume if at bottom
     function checkScrollPosition() {
         const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
         if (chatLineCount < MIN_MESSAGES_TO_PAUSE) return;
 
         const currentScrollY = window.scrollY;
+        const buffer = 5; 
+        const isAtBottom = (window.innerHeight + currentScrollY + buffer) >= document.documentElement.scrollHeight;
 
-        // Pause only if the user manually scrolled up
-        if (currentScrollY < lastScrollY && !isPaused && currentScrollY > 0 && userScrolledManually) {
+        if (!isAtBottom && !isPaused) {
             isPaused = true;
             pauseButton.style.display = 'block';
-        }
-
-        // Resume if scrolled to (or near) the bottom
-        const buffer = 5; // allow a few pixels leeway
-        const isAtVeryBottom = (window.innerHeight + currentScrollY + buffer) >= document.documentElement.scrollHeight;
-        if (isAtVeryBottom && isPaused) {
+        } else if (isAtBottom && isPaused) {
             resumeChat();
         }
 
         lastScrollY = currentScrollY;
     }
 
+    // Setup MutationObserver to watch for new chat lines
     const observer = new MutationObserver(handleChatUpdate);
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -278,6 +260,7 @@ opacity:0;
         scrollTimeout = setTimeout(checkScrollPosition, 50);
     });
 
+    // Start scrolled to the bottom on load
     window.scrollTo(0, document.documentElement.scrollHeight);
     lastScrollY = window.scrollY;
 </script>
