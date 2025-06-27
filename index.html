@@ -159,54 +159,92 @@ opacity:0;
     </script>
 </body>
 <script>
+    // --- CONFIGURATION ---
+    // The chat won't pause until at least this many messages exist.
     const MIN_MESSAGES_TO_PAUSE = 10;
-    let isPaused = false;
-    let lastScrollY = window.scrollY;
+    // How many pixels the user must scroll up before the chat pauses.
+    // This prevents accidental pauses from tiny scroll flickers.
+    const SCROLL_UP_THRESHOLD = 2; // NEW
 
-    // Create the "Chat Paused" button
+    // --- STATE VARIABLES ---
+    // isPaused: Our single source of truth. true = user has scrolled up, false = auto-scrolling.
+    let isPaused = false;
+    // lastScrollY: Tracks the last scroll position to detect scroll direction.
+    let lastScrollY = window.scrollY;
+    // isAutoScrolling: Flag to prevent our own auto-scroll from triggering the pause logic. // NEW
+    let isAutoScrolling = false;
+
+    // --- CREATE THE "CHAT PAUSED" BUTTON ---
     const pauseButton = document.createElement('button');
     const img = document.createElement("img");
-    img.src = "./pause.jpg";
+    img.src = "./pause.jpg"; // Make sure this path is correct
     img.style.verticalAlign = "middle";
     img.style.width = "21px";
     img.style.height = "21px";
     img.style.marginRight = "10px";
+
     pauseButton.appendChild(img);
     pauseButton.appendChild(document.createTextNode('Chat Paused - Click to resume'));
+    // Apply styles
     Object.assign(pauseButton.style, {
         position: 'fixed',
         bottom: '30px',
         left: '50%',
         transform: 'translateX(-50%)',
         width: '80%',
+        maxWidth: '400px', // Good practice for larger screens
         padding: '10px 20px',
         fontSize: '18px',
         fontWeight: '600',
         background: 'rgba(0, 0, 0, 0.85)',
         color: 'white',
-        display: 'none',
+        display: 'none', // Initially hidden
         zIndex: '1000',
         borderRadius: '25px',
-        border: '2px solid #00ff00',
+        border: '2px solid #00ff00', // Lime green
         cursor: 'pointer',
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
     });
     document.body.appendChild(pauseButton);
 
+
+    // --- FUNCTIONS ---
+
+    /**
+     * Resumes the chat, hiding the pause button, showing all messages, and scrolling to the bottom.
+     */
     function resumeChat() {
         isPaused = false;
         pauseButton.style.display = 'none';
 
-        // Show hidden messages when resumed
-        document.querySelectorAll('.chat_line.animate[data-hidden="true"]').forEach(el => {
-            el.style.display = '';
-            el.removeAttribute('data-hidden');
+        // Show any messages that were hidden while paused
+        document.querySelectorAll('.chat_line.animate[data-hidden="true"]').forEach(element => {
+            element.style.display = '';
+            element.removeAttribute('data-hidden');
         });
 
-        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-        setTimeout(() => { lastScrollY = window.scrollY; }, 300);
+        // Set the flag to prevent this scroll from re-triggering pause logic // MODIFIED
+        isAutoScrolling = true;
+        
+        // Scroll smoothly to the bottom
+        window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: 'smooth'
+        });
+        
+        // After scrolling, update lastScrollY to the new bottom position
+        // Use a small delay to allow the smooth scroll to complete
+        setTimeout(() => {
+            lastScrollY = window.scrollY;
+            // It's safe to reset the flag now, though the scroll handler would also do it.
+            isAutoScrolling = false;
+        }, 300);
     }
 
+    /**
+     * This function is the heart of the auto-scroll and pause logic.
+     * It's called by the MutationObserver whenever the chat content changes.
+     */
     function handleChatUpdate(mutationsList) {
         let hasNewMessage = false;
         for (const mutation of mutationsList) {
@@ -222,35 +260,65 @@ opacity:0;
                 }
             }
         }
+
+        // If new messages arrived AND we are not paused, scroll to the bottom.
         if (hasNewMessage && !isPaused) {
+            // Signal that the upcoming scroll is programmatic. // MODIFIED
+            isAutoScrolling = true;
             window.scrollTo(0, document.documentElement.scrollHeight);
-            lastScrollY = document.documentElement.scrollHeight - window.innerHeight;
+            // After an instant auto-scroll, update our last known position immediately. // MODIFIED
+            lastScrollY = window.scrollY;
         }
     }
 
-    // New checkScrollPosition logic:
-    // Pause if scroll is away from bottom in any way, resume if at bottom
+
+    /**
+     * Checks the user's scroll direction to determine if the chat should be paused.
+     */
     function checkScrollPosition() {
+        // If the last scroll was programmatic, ignore this check and reset the flag. // NEW
+        // This is the core fix to prevent auto-scroll from causing a pause.
+        if (isAutoScrolling) {
+            isAutoScrolling = false;
+            // Also update lastScrollY because we're skipping the normal update at the end of the function.
+            lastScrollY = window.scrollY;
+            return;
+        }
+
         const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
-        if (chatLineCount < MIN_MESSAGES_TO_PAUSE) return;
+        if (chatLineCount < MIN_MESSAGES_TO_PAUSE) {
+            return;
+        }
 
         const currentScrollY = window.scrollY;
-        const buffer = 5; 
-        const isAtBottom = (window.innerHeight + currentScrollY + buffer) >= document.documentElement.scrollHeight;
-
-        if (!isAtBottom && !isPaused) {
+        
+        // --- PAUSE LOGIC --- // MODIFIED
+        // Pause if the user scrolls UP by more than our threshold.
+        if (lastScrollY - currentScrollY > SCROLL_UP_THRESHOLD && !isPaused) {
             isPaused = true;
             pauseButton.style.display = 'block';
-        } else if (isAtBottom && isPaused) {
+        }
+
+        // --- RESUME LOGIC ---
+        // If the user scrolls all the way to the bottom, resume the chat.
+        // Add a small buffer (e.g., 5px) to make it easier to hit the bottom.
+        const isAtVeryBottom = (window.innerHeight + currentScrollY) >= (document.documentElement.scrollHeight - 5);
+        if (isAtVeryBottom && isPaused) {
             resumeChat();
         }
 
+        // ALWAYS update the last scroll position for the next check.
         lastScrollY = currentScrollY;
     }
 
-    // Setup MutationObserver to watch for new chat lines
+
+    // --- SETUP OBSERVERS AND EVENT LISTENERS ---
+
     const observer = new MutationObserver(handleChatUpdate);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 
     pauseButton.addEventListener('click', resumeChat);
 
@@ -260,8 +328,9 @@ opacity:0;
         scrollTimeout = setTimeout(checkScrollPosition, 50);
     });
 
-    // Start scrolled to the bottom on load
+    // --- INITIAL SCROLL ---
     window.scrollTo(0, document.documentElement.scrollHeight);
     lastScrollY = window.scrollY;
+
 </script>
 </html>
