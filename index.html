@@ -550,6 +550,8 @@ function generateBadgesHTML(messageData) {
     // --- STATE VARIABLES ---
     let isPaused = false;
     let lastScrollY = window.scrollY;
+    // NEW: A flag to tell our scroll listener to ignore programmatic scrolls.
+    let isAutoScrolling = false;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
     const pauseButton = document.createElement('button');
@@ -562,6 +564,7 @@ function generateBadgesHTML(messageData) {
 
     pauseButton.appendChild(img);
     pauseButton.appendChild(document.createTextNode('Chat Paused - Click to resume'));
+    // Apply styles
     Object.assign(pauseButton.style, {
         position: 'fixed',
         bottom: '30px',
@@ -573,10 +576,10 @@ function generateBadgesHTML(messageData) {
         fontWeight: '600',
         background: 'rgba(0, 0, 0, 0.85)',
         color: 'white',
-        display: 'none',
+        display: 'none', // Initially hidden
         zIndex: '1000',
         borderRadius: '25px',
-        border: '2px solid #00ff00',
+        border: '2px solid #00ff00', // Lime green
         cursor: 'pointer',
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
     });
@@ -598,7 +601,7 @@ function generateBadgesHTML(messageData) {
             top: document.documentElement.scrollHeight,
             behavior: 'smooth'
         });
-
+        
         setTimeout(() => {
             lastScrollY = window.scrollY;
         }, 300);
@@ -621,34 +624,43 @@ function generateBadgesHTML(messageData) {
         }
 
         if (hasNewMessage && !isPaused) {
+            // MODIFICATION: Set the flag before we scroll
+            isAutoScrolling = true;
             window.scrollTo(0, document.documentElement.scrollHeight);
+
+            // MODIFICATION: Unset the flag after a delay. This creates a "safe window"
+            // where scroll events are ignored by the pause logic.
+            setTimeout(() => {
+                isAutoScrolling = false;
+            }, 150); // 150ms should be plenty of time for the scroll to finish.
         }
     }
 
-    /**
-     * Checks the user's scroll direction to determine if the chat should be paused or resumed.
-     * This version is designed for instant responsiveness with the mousewheel.
-     */
     function checkScrollPosition() {
-        const currentScrollY = window.scrollY;
-        
-        // A more reliable way to check if we are at the bottom of the page.
-        // We use a 10px buffer to account for rounding errors or sub-pixel rendering.
-        const isAtBottom = (window.innerHeight + currentScrollY) >= (document.documentElement.scrollHeight - 10);
-
-        // --- PAUSE LOGIC ---
-        // If we are scrolling UP, and we are not paused, and we are NOT at the bottom
-        if (currentScrollY < lastScrollY && !isPaused && !isAtBottom) {
-            const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
-            if (chatLineCount >= MIN_MESSAGES_TO_PAUSE) {
-                isPaused = true;
-                pauseButton.style.display = 'block';
-            }
+        // MODIFICATION: If our code is auto-scrolling, skip the pause check.
+        if (isAutoScrolling) {
+            // We must still update our last scroll position so it's correct
+            // for the next time the USER scrolls.
+            lastScrollY = window.scrollY;
+            return;
         }
 
-        // --- RESUME LOGIC ---
-        // If we ARE paused and the user scrolls back to the bottom, resume.
-        if (isPaused && isAtBottom) {
+        const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
+        if (chatLineCount < MIN_MESSAGES_TO_PAUSE) {
+            return;
+        }
+
+        const currentScrollY = window.scrollY;
+        
+        // PAUSE LOGIC: Now only triggers on genuine user scrolls.
+        if (currentScrollY < lastScrollY && !isPaused) {
+            isPaused = true;
+            pauseButton.style.display = 'block';
+        }
+
+        // RESUME LOGIC
+        const isAtVeryBottom = (window.innerHeight + currentScrollY) >= (document.documentElement.scrollHeight - 5);
+        if (isAtVeryBottom && isPaused) {
             resumeChat();
         }
 
@@ -658,7 +670,6 @@ function generateBadgesHTML(messageData) {
 
 
     // --- SETUP OBSERVERS AND EVENT LISTENERS ---
-
     const observer = new MutationObserver(handleChatUpdate);
     observer.observe(document.body, {
         childList: true,
@@ -667,16 +678,14 @@ function generateBadgesHTML(messageData) {
 
     pauseButton.addEventListener('click', resumeChat);
 
-    // **** THIS IS THE CORRECTED PART ****
-    // We listen directly to the scroll event without any delay (setTimeout).
-    // This makes the response to the mousewheel instant.
-    // { passive: true } is a performance optimization.
-    window.addEventListener('scroll', checkScrollPosition, { passive: true });
-
+    let scrollTimeout;
+    window.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(checkScrollPosition, 50);
+    });
 
     // --- INITIAL SCROLL ---
     window.scrollTo(0, document.documentElement.scrollHeight);
     lastScrollY = window.scrollY;
-
 </script>
 </html>
