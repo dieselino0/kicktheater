@@ -548,10 +548,8 @@ function generateBadgesHTML(messageData) {
     const MIN_MESSAGES_TO_PAUSE = 10;
 
     // --- STATE VARIABLES ---
-    // userHasScrolledUp: Our primary source of truth. true = user has scrolled up, false = auto-scrolling.
+    // Our single source of truth. true = user has scrolled up, false = auto-scrolling.
     let userHasScrolledUp = false;
-    // EDIT: A flag to prevent our own scroll actions from being interpreted as user actions.
-    let isProgrammaticScroll = false;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
     const pauseButton = document.createElement('button');
@@ -588,6 +586,17 @@ function generateBadgesHTML(messageData) {
     // --- FUNCTIONS ---
 
     /**
+     * Scrolls the window to the very bottom.
+     * @param {boolean} smooth - Whether to scroll smoothly or instantly.
+     */
+    function scrollToBottom(smooth = false) {
+        window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: smooth ? 'smooth' : 'auto'
+        });
+    }
+
+    /**
      * Resumes the chat by explicitly setting the state and scrolling to the bottom.
      */
     function resumeChat() {
@@ -596,21 +605,6 @@ function generateBadgesHTML(messageData) {
         scrollToBottom(true); // Scroll smoothly when resuming via button
     }
 
-    /**
-     * EDIT: Scrolls the window to the very bottom and flags it as a programmatic scroll.
-     * @param {boolean} smooth - Whether to scroll smoothly or instantly.
-     */
-    function scrollToBottom(smooth = false) {
-        isProgrammaticScroll = true;
-        window.scrollTo({
-            top: document.documentElement.scrollHeight,
-            behavior: smooth ? 'smooth' : 'auto'
-        });
-        // We set the flag back to false after a tiny delay, allowing the scroll event to fire first.
-        setTimeout(() => {
-            isProgrammaticScroll = false;
-        }, 100); // 100ms is generally safe for both instant and smooth scrolls.
-    }
 
     /**
      * Called by the MutationObserver. If we are not paused, it scrolls down.
@@ -618,55 +612,53 @@ function generateBadgesHTML(messageData) {
     function handleChatUpdate(mutationsList) {
         let hasNewMessage = false;
         for (const mutation of mutationsList) {
-            if (mutation.type === 'childList') {
-                for (const node of mutation.addedNodes) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === 1 && node.classList.contains('chat_line') && node.classList.contains('animate')) {
                         hasNewMessage = true;
-                        break; // No need to check further
+                        break;
                     }
                 }
             }
             if (hasNewMessage) break;
         }
 
-        // If new messages arrived AND the user hasn't scrolled up, scroll to the bottom.
         if (hasNewMessage && !userHasScrolledUp) {
             scrollToBottom(false); // New messages should appear instantly
         }
     }
 
-
     /**
-     * EDIT: This function now ONLY reacts to MANUAL user scrolls.
-     * It checks the user's scroll position to determine if the chat should be paused or resumed.
+     * NEW: This function only runs on explicit user input (mouse wheel).
+     * It's responsible for PAUSING the chat.
      */
-    function checkScrollPosition() {
-        // If the scroll was triggered by our code, do nothing.
-        if (isProgrammaticScroll) {
-            return;
-        }
-
-        const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
-        if (chatLineCount < MIN_MESSAGES_TO_PAUSE && !userHasScrolledUp) {
-            return; // Don't allow pausing if chat is too short
-        }
-
-        // EDIT: This is a strict check for being at the very bottom.
-        // Math.ceil() helps account for fractional pixel values from browser rendering.
-        const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
-
-        if (isAtBottom) {
-            // The user has manually scrolled back to the bottom. Resume auto-scrolling.
-            if (userHasScrolledUp) {
-                userHasScrolledUp = false;
-                pauseButton.style.display = 'none';
-            }
-        } else {
-            // The user has manually scrolled up. Pause auto-scrolling.
-            if (!userHasScrolledUp) {
+    function handleUserScrollIntent(event) {
+        // We only care when the user scrolls UP (deltaY is negative).
+        if (event.deltaY < 0) {
+            const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
+            if (chatLineCount >= MIN_MESSAGES_TO_PAUSE && !userHasScrolledUp) {
                 userHasScrolledUp = true;
                 pauseButton.style.display = 'block';
             }
+        }
+    }
+
+    /**
+     * REVISED: This function's only job is to check if a user has scrolled
+     * back to the bottom to RESUME the chat.
+     */
+    function checkResumePosition() {
+        // If we are not paused, there's nothing to do here.
+        if (!userHasScrolledUp) {
+            return;
+        }
+
+        // A strict check for being at the very bottom.
+        const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
+
+        if (isAtBottom) {
+            userHasScrolledUp = false;
+            pauseButton.style.display = 'none';
         }
     }
 
@@ -678,11 +670,13 @@ function generateBadgesHTML(messageData) {
 
     pauseButton.addEventListener('click', resumeChat);
 
-    // This listener now exclusively tracks user-initiated scrolls.
-    window.addEventListener('scroll', checkScrollPosition);
+    // NEW: Listen for the 'wheel' event to detect a user's intent to scroll up and pause.
+    window.addEventListener('wheel', handleUserScrollIntent, { passive: true });
+
+    // REVISED: The 'scroll' event is now only used to detect when to resume.
+    window.addEventListener('scroll', checkResumePosition, { passive: true });
 
     // --- INITIAL SCROLL ---
-    // Start scrolled to the bottom when the page loads.
     scrollToBottom(false);
 
 </script>
