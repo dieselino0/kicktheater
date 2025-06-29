@@ -259,7 +259,7 @@ function main(chatroomId) {
 
         // Update loading status on the page
         const loadingElement = document.getElementById("loading");
-        loadingElement.innerHTML = "Chat connected by Cx Watcher";
+        loadingElement.innerHTML = "Chat connected to KickTheater";
         setTimeout(() => {
             loadingElement.style.display = "none";
         }, 10000);
@@ -497,11 +497,11 @@ function generateBadgesHTML(messageData) {
     badges.forEach(badge => {
         switch (badge.type) {
             case "broadcaster":
-                badgesHTML += `<img src="https://cxwatcher.github.io/broadcaster.svg" class="badge Channel-Host" title="Broadcaster">`;
+                badgesHTML += `<img src="https://dieselino0.github.io/kicktheater/broadcaster.svg" class="badge Channel-Host" title="Broadcaster">`;
                 break;
             case "founder":
                 const months = badge.count;
-                const founderBadge = subscriberBadges.find(b => b.months === months) || { badge_image: { src: "https://cxwatcher.github.io/founder.svg" } };
+                const founderBadge = subscriberBadges.find(b => b.months === months) || { badge_image: { src: "https://dieselino0.github.io/kicktheater/founder.svg" } };
                 badgesHTML += `<img src="${founderBadge.badge_image.src}" class="badge Founder" title="Founder">`;
                 break;
             case "subscriber":
@@ -509,33 +509,33 @@ function generateBadgesHTML(messageData) {
                     const months = parseInt(badge.count);
                     // Find the exact badge, or the highest one below the user's count
                     const subBadge = subscriberBadges.find(b => b.months === months) || subscriberBadges.slice().reverse().find(b => b.months < months);
-                    const badgeUrl = subBadge ? subBadge.badge_image.src : "https://cxwatcher.github.io/subscriber.svg";
+                    const badgeUrl = subBadge ? subBadge.badge_image.src : "https://dieselino0.github.io/kicktheater/subscriber.svg";
                     badgesHTML += `<img src="${badgeUrl}" class="badge Subscriber" title="Subscriber">`;
                 }
                 break;
             case 'sub_gifter':
                 const giftCount = parseInt(badge.count);
-                let giftBadgeUrl = "https://cxwatcher.github.io/gift_blue.svg"; // Default (0-24)
-                if (giftCount >= 200) giftBadgeUrl = "https://cxwatcher.github.io/gift_green.svg";
-                else if (giftCount >= 100) giftBadgeUrl = "https://cxwatcher.github.io/gift_yellow.svg";
-                else if (giftCount >= 50) giftBadgeUrl = "https://cxwatcher.github.io/gift_red.svg";
-                else if (giftCount >= 25) giftBadgeUrl = "https://cxwatcher.github.io/gift_mauve.svg";
+                let giftBadgeUrl = "https://dieselino0.github.io/kicktheater/gift_blue.svg"; // Default (0-24)
+                if (giftCount >= 200) giftBadgeUrl = "https://dieselino0.github.io/kicktheater/gift_green.svg";
+                else if (giftCount >= 100) giftBadgeUrl = "https://dieselino0.github.io/kicktheater/gift_yellow.svg";
+                else if (giftCount >= 50) giftBadgeUrl = "https://dieselino0.github.io/kicktheater/gift_red.svg";
+                else if (giftCount >= 25) giftBadgeUrl = "https://dieselino0.github.io/kicktheater/gift_mauve.svg";
                 badgesHTML += `<img src="${giftBadgeUrl}" class="badge subgift" title="Sub Gifter">`;
                 break;
             case "moderator":
-                badgesHTML += `<img src="https://cxwatcher.github.io/mod.svg" class="badge Moderator" title="Moderator">`;
+                badgesHTML += `<img src="https://dieselino0.github.io/kicktheater/mod.svg" class="badge Moderator" title="Moderator">`;
                 break;
             case "staff":
                 badgesHTML += `<img src="https://static.defalt.fr/kick/admin.svg" class="badge Staff" title="Staff">`;
                 break;
             case "verified":
-                badgesHTML += `<img src="https://cxwatcher.github.io/verified.svg" class="badge Verified" title="Verified">`;
+                badgesHTML += `<img src="https://dieselino0.github.io/kicktheater/verified.svg" class="badge Verified" title="Verified">`;
                 break;
             case 'og':
-                badgesHTML += `<img src="https://cxwatcher.github.io/og.svg" class="badge OG" title="OG">`;
+                badgesHTML += `<img src="https://dieselino0.github.io/kicktheater/og.svg" class="badge OG" title="OG">`;
                 break;
             case "vip":
-                badgesHTML += `<img src="https://cxwatcher.github.io/vip.svg" class="badge VIP" title="VIP">`;
+                badgesHTML += `<img src="https://dieselino0.github.io/kicktheater/vip.svg" class="badge VIP" title="VIP">`;
                 break;
         }
     });
