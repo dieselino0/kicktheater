@@ -546,13 +546,14 @@ function generateBadgesHTML(messageData) {
 <script>
     // The chat won't pause until at least this many messages exist.
     const MIN_MESSAGES_TO_PAUSE = 10;
-    // How close to the bottom (in pixels) the user must be to be considered "at the bottom".
-    const SCROLL_BOTTOM_TOLERANCE = 15; // Increased tolerance slightly for more robustness
+    // A tiny pixel buffer for scroll-up detection to prevent false positives from minor layout shifts.
+    // This is NOT a resume tolerance zone, it's a technical buffer for the pause trigger.
+    const PAUSE_SCROLL_BUFFER = 5;
 
     // --- STATE VARIABLES ---
-    // true = user has scrolled up, false = auto-scrolling.
-    let userHasScrolledUp = false;
-    // **NEW**: Flag to ignore scroll events triggered by our own code.
+    let isPaused = false;
+    let lastScrollY = window.scrollY;
+    // Flag to tell our scroll listener to ignore scrolls triggered by our own code.
     let isProgrammaticScroll = false;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
@@ -572,7 +573,7 @@ function generateBadgesHTML(messageData) {
         left: '50%',
         transform: 'translateX(-50%)',
         width: '80%',
-        maxWidth: '400px', // Added max-width for better look on large screens
+        maxWidth: '400px',
         padding: '10px 20px',
         fontSize: '18px',
         fontWeight: '600',
@@ -583,74 +584,51 @@ function generateBadgesHTML(messageData) {
         borderRadius: '25px',
         border: '2px solid #00ff00',
         cursor: 'pointer',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-        transition: 'opacity 0.3s, transform 0.3s' // Smooth appearance
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
     });
     document.body.appendChild(pauseButton);
 
 
-    // --- HELPER FUNCTIONS ---
+    // --- FUNCTIONS ---
 
     /**
-     * Checks if the user is scrolled to the bottom of the page, with a tolerance.
-     */
-    function isScrolledToBottom() {
-        const scrollHeight = document.documentElement.scrollHeight;
-        const scrollTop = window.scrollY;
-        const clientHeight = document.documentElement.clientHeight;
-        return scrollHeight - scrollTop - clientHeight <= SCROLL_BOTTOM_TOLERANCE;
-    }
-
-    /**
-     * **MODIFIED**: Scrolls the window to the bottom, managing the programmatic scroll flag.
-     * This prevents the scroll handler from fighting the scroll action.
+     * A "safe" scroll function that manages the programmatic scroll flag.
+     * This is the ONLY function that should be used to scroll the page programmatically.
      */
     function scrollToBottom(behavior = 'auto') {
-        isProgrammaticScroll = true; // Set the flag before starting the scroll
+        isProgrammaticScroll = true;
         window.scrollTo({
             top: document.documentElement.scrollHeight,
             behavior: behavior
         });
 
-        // After the scroll is likely finished, reset the flag.
-        // The delay should be longer for 'smooth' scrolls.
-        const resetDelay = behavior === 'smooth' ? 500 : 100;
+        // After the scroll is likely finished, reset the flag and update lastScrollY
+        // so the next user scroll is measured correctly.
+        const resetDelay = behavior === 'smooth' ? 350 : 100;
         setTimeout(() => {
+            lastScrollY = window.scrollY; // Sync lastScrollY to the new bottom
             isProgrammaticScroll = false;
         }, resetDelay);
     }
 
-    // --- CORE LOGIC FUNCTIONS ---
-
     /**
-     * Pauses the chat auto-scroll and displays the pause button.
-     */
-    function pauseChat() {
-        if (userHasScrolledUp) return;
-        userHasScrolledUp = true;
-        pauseButton.style.display = 'block';
-    }
-
-    /**
-     * Resumes the chat, hiding the pause button and scrolling to the bottom.
+     * Resumes the chat.
      */
     function resumeChat() {
-        userHasScrolledUp = false;
+        isPaused = false;
         pauseButton.style.display = 'none';
 
-        let newMessagesFound = false;
         document.querySelectorAll('.chat_line.animate[data-hidden="true"]').forEach(element => {
             element.style.display = '';
             element.removeAttribute('data-hidden');
-            newMessagesFound = true;
         });
 
-        // Scroll smoothly to see the new messages.
+        // Use our safe scroll function
         scrollToBottom('smooth');
     }
 
     /**
-     * Handles new chat messages added to the DOM.
+     * Handles new messages added to the DOM.
      */
     function handleChatUpdate(mutationsList) {
         let hasNewMessage = false;
@@ -659,7 +637,7 @@ function generateBadgesHTML(messageData) {
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === 1 && node.classList.contains('chat_line') && node.classList.contains('animate')) {
                         hasNewMessage = true;
-                        if (userHasScrolledUp) {
+                        if (isPaused) {
                             node.style.display = 'none';
                             node.setAttribute('data-hidden', 'true');
                         }
@@ -668,41 +646,51 @@ function generateBadgesHTML(messageData) {
             }
         }
 
-        if (hasNewMessage && !userHasScrolledUp) {
-            // New message arrived while at the bottom, scroll instantly.
+        if (hasNewMessage && !isPaused) {
+            // Use our safe scroll function for instant scrolling
             scrollToBottom('auto');
         }
     }
 
     /**
-     * **MODIFIED**: Checks scroll position but IGNORES programmatic scrolls.
+     * Checks the user's scroll position to determine if the chat should be paused or resumed.
+     * This is the original logic, but now protected by the isProgrammaticScroll flag.
      */
-    function checkScrollAndToggleState() {
-        // **CRITICAL FIX**: If the scroll was triggered by our code, do nothing.
+    function checkScrollPosition() {
+        // **THE CRITICAL FIX**: If the scroll was triggered by our code, do nothing.
         if (isProgrammaticScroll) {
             return;
         }
 
         const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
         if (chatLineCount < MIN_MESSAGES_TO_PAUSE) {
-            if (userHasScrolledUp) resumeChat();
             return;
         }
 
-        const atBottom = isScrolledToBottom();
+        const currentScrollY = window.scrollY;
 
-        if (atBottom && userHasScrolledUp) {
-            // User manually scrolled back to the bottom. Resume.
-            resumeChat();
-        } else if (!atBottom && !userHasScrolledUp) {
-            // User was at the bottom but scrolled up. Pause.
-            pauseChat();
+        // --- PAUSE LOGIC ---
+        // Pause if the user has scrolled up by a meaningful amount.
+        // The buffer prevents tiny 1-2px jitters from pausing the chat.
+        if ((lastScrollY - currentScrollY) > PAUSE_SCROLL_BUFFER && !isPaused) {
+            isPaused = true;
+            pauseButton.style.display = 'block';
         }
+
+        // --- RESUME LOGIC ---
+        // Resumes if the user is scrolled precisely to the bottom.
+        // `Math.ceil` helps account for sub-pixel rendering differences.
+        const isAtVeryBottom = (window.innerHeight + Math.ceil(currentScrollY)) >= document.documentElement.scrollHeight;
+        if (isAtVeryBottom && isPaused) {
+            resumeChat();
+        }
+
+        // ALWAYS update the last scroll position for the next user scroll check.
+        lastScrollY = currentScrollY;
     }
 
 
     // --- SETUP OBSERVERS AND EVENT LISTENERS ---
-
     const observer = new MutationObserver(handleChatUpdate);
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -711,13 +699,12 @@ function generateBadgesHTML(messageData) {
     let scrollTimeout;
     window.addEventListener('scroll', () => {
         clearTimeout(scrollTimeout);
-        // Use a slightly longer debounce time to be less sensitive
-        scrollTimeout = setTimeout(checkScrollAndToggleState, 150);
+        scrollTimeout = setTimeout(checkScrollPosition, 50);
     });
 
     // --- INITIALIZATION ---
     window.addEventListener('load', () => {
-        // Use our safe scrolling function for the initial scroll.
+        // Use our safe scroll function for the initial page load.
         scrollToBottom('auto');
     });
 
