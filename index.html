@@ -645,7 +645,7 @@ function generateBadgesHTML(messageData) {
             clearTimeout(autoScrollTimeout);
             autoScrollTimeout = setTimeout(() => {
                 isAutoScrolling = false;
-            }, 150); // 150ms is a safe grace period.
+            }, 100); // 100ms is a safe grace period.
 
             lastScrollY = window.scrollY; // We still update the position.
             return; // IMPORTANT: Exit the function early to skip the pause check.
