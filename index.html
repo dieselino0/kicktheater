@@ -550,9 +550,9 @@ function generateBadgesHTML(messageData) {
     // --- STATE VARIABLES ---
     let userHasScrolledUp = false;
     let isUserInteracting = false;
-    let interactionResetTimer;
-    // <<< CHANGE 1: A simple flag to know if we are in the middle of a scrollbar drag.
+    // This is the key flag to track a continuous drag action.
     let isDraggingScrollbar = false;
+    let interactionResetTimer;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
     const pauseButton = document.createElement('button');
@@ -621,14 +621,22 @@ function generateBadgesHTML(messageData) {
     }
 
     function handleScroll() {
-        clearTimeout(interactionResetTimer);
-        interactionResetTimer = setTimeout(() => {
-            isUserInteracting = false;
-        }, 150);
-
+        // This is a vital guard. If our code isn't expecting a user scroll, ignore it.
+        // This prevents programmatic scrolls from triggering pause/resume.
         if (!isUserInteracting) {
             return;
         }
+
+        // This timer is now ONLY for non-drag interactions (wheel, keyboard).
+        clearTimeout(interactionResetTimer);
+        interactionResetTimer = setTimeout(() => {
+            // If the user is dragging, the interaction is NOT over. Do nothing.
+            if (isDraggingScrollbar) {
+                return;
+            }
+            // If it was a wheel/key scroll, the interaction is now over.
+            isUserInteracting = false;
+        }, 250); // Increased delay slightly for more tolerance
 
         const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
         if (chatLineCount < MIN_MESSAGES_TO_PAUSE) {
@@ -637,15 +645,15 @@ function generateBadgesHTML(messageData) {
 
         const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
 
-        // <<< CHANGE 2: We only resume if we are at the bottom AND the user is NOT dragging the scrollbar.
+        // The core logic is now simple again.
+        // We only resume if at the bottom AND not in the middle of a drag.
         if (isAtBottom && !isDraggingScrollbar) {
-            // User scrolled back to the bottom. Resume.
             if (userHasScrolledUp) {
                 userHasScrolledUp = false;
                 pauseButton.style.display = 'none';
             }
-        } else if (!isAtBottom) { // Changed to 'else if' for clarity
-            // User scrolled up. Pause.
+        } else if (!isAtBottom) {
+            // If we are anywhere else, we pause.
             if (!userHasScrolledUp) {
                 userHasScrolledUp = true;
                 pauseButton.style.display = 'block';
@@ -666,33 +674,34 @@ function generateBadgesHTML(messageData) {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Keep these original listeners for general interaction
+    // Handle non-drag interactions
     window.addEventListener('wheel', flagUserInteraction, { passive: true });
-    window.addEventListener('touchstart', flagUserInteraction, { passive: true });
     window.addEventListener('keydown', (e) => {
         if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) {
             flagUserInteraction();
         }
     }, { passive: true });
 
-    // <<< CHANGE 3: Add specific listeners to manage the drag state.
-    window.addEventListener('mousedown', () => {
+    // Use specific listeners for the start and end of a drag/touch action
+    function handleDragStart() {
+        isUserInteracting = true;
         isDraggingScrollbar = true;
-        flagUserInteraction(); // Also flag it as a general interaction
-    }, { passive: true });
+    }
 
-    window.addEventListener('mouseup', () => {
-        if (isDraggingScrollbar) {
-            isDraggingScrollbar = false;
-            // After letting go, we must re-evaluate the scroll position immediately.
-            // This ensures that if you release at the bottom, the chat resumes.
-            handleScroll();
-        }
-    }, { passive: true });
+    function handleDragEnd() {
+        isDraggingScrollbar = false;
+        // After letting go, we MUST re-run the scroll logic to check our final position.
+        // This is what makes it resume correctly if you release at the bottom.
+        handleScroll();
+    }
 
+    window.addEventListener('mousedown', handleDragStart, { passive: true });
+    window.addEventListener('touchstart', handleDragStart, { passive: true });
+
+    window.addEventListener('mouseup', handleDragEnd, { passive: true });
+    window.addEventListener('touchend', handleDragEnd, { passive: true });
 
     // --- INITIAL SCROLL ---
     scrollToBottom(false);
-
 </script>
 </html>
