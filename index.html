@@ -550,6 +550,8 @@ function generateBadgesHTML(messageData) {
     // --- STATE VARIABLES ---
     let userHasScrolledUp = false;
     let isUserInteracting = false;
+    // <<< NEW: Tracks if the mouse/touch is currently held down.
+    let isPointerDown = false;
     let interactionResetTimer;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
@@ -593,11 +595,7 @@ function generateBadgesHTML(messageData) {
         });
     }
 
-    /**
-     * Resumes the chat by explicitly setting the state and scrolling to the bottom.
-     */
     function resumeChat() {
-        // This function is now only called when it's safe to resume.
         userHasScrolledUp = false;
         pauseButton.style.display = 'none';
         scrollToBottom(true);
@@ -622,34 +620,28 @@ function generateBadgesHTML(messageData) {
         }
     }
 
-    /**
-     * The primary scroll handler with the corrected logic.
-     */
     function handleScroll() {
-        // If our own code is scrolling, do nothing.
         if (!isUserInteracting) {
             return;
         }
 
-        // On every scroll event, clear the "end of interaction" timer.
         clearTimeout(interactionResetTimer);
 
-        // <<< KEY CHANGE 1: THE RESUME LOGIC IS MOVED HERE
-        // Set a new timer. This code will only run 150ms *after* the user STOPS scrolling.
         interactionResetTimer = setTimeout(() => {
-            isUserInteracting = false; // The scroll gesture is officially over.
+            // <<< CHANGE: Only consider the interaction 'over' if the user is not
+            // actively holding the mouse button or touching the screen.
+            if (isPointerDown) {
+                return; // The user is still dragging, do nothing yet.
+            }
 
-            // Now we check the user's final position.
+            isUserInteracting = false; // Interaction is truly over.
+
             const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
-
-            // If the user *ended* at the bottom and the chat was paused, it's safe to resume.
             if (isAtBottom && userHasScrolledUp) {
                 resumeChat();
             }
         }, 150);
 
-
-        // --- This part of the code still runs on every pixel scrolled ---
 
         const chatLineCount = document.querySelectorAll('.chat_line.animate').length;
         if (chatLineCount < MIN_MESSAGES_TO_PAUSE) {
@@ -658,20 +650,16 @@ function generateBadgesHTML(messageData) {
 
         const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
 
-        // <<< KEY CHANGE 2: THE SCROLL HANDLER IS NOW ONLY RESPONSIBLE FOR PAUSING
-        // If the user scrolls up, we pause immediately.
-        // We no longer have an "else" block here that resumes the chat.
         if (!isAtBottom) {
             if (!userHasScrolledUp) {
                 userHasScrolledUp = true;
                 pauseButton.style.display = 'block';
             }
         }
+        // <<< CHANGE: The logic to resume on scroll has been completely moved
+        // to the timer, making this part only responsible for pausing.
     }
 
-    /**
-     * This function flags that a user has started a scroll action.
-     */
     function flagUserInteraction() {
         isUserInteracting = true;
     }
@@ -683,15 +671,32 @@ function generateBadgesHTML(messageData) {
 
     pauseButton.addEventListener('click', resumeChat);
 
-    // The main scroll handler that does the work.
     window.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Listen for all common ways a user can initiate a scroll and flag it.
-    window.addEventListener('mousedown', flagUserInteraction, { passive: true });
+    // Use a single function for all interaction start events
+    function handleInteractionStart() {
+        isPointerDown = true;
+        flagUserInteraction();
+    }
+
+    // Use a single function for all interaction end events
+    function handleInteractionEnd() {
+        isPointerDown = false;
+        // After lifting the mouse, trigger a final scroll check.
+        // This handles the case where you stop dragging at the bottom.
+        handleScroll();
+    }
+
+    // <<< CHANGE: More robust event handling for pointer state
+    window.addEventListener('mousedown', handleInteractionStart, { passive: true });
+    window.addEventListener('touchstart', handleInteractionStart, { passive: true });
+
+    window.addEventListener('mouseup', handleInteractionEnd, { passive: true });
+    window.addEventListener('touchend', handleInteractionEnd, { passive: true });
+
+    // Wheel and keyboard don't have a 'down' state, so they just flag interaction.
     window.addEventListener('wheel', flagUserInteraction, { passive: true });
-    window.addEventListener('touchstart', flagUserInteraction, { passive: true });
     window.addEventListener('keydown', (e) => {
-        // Only flag interaction for keys that cause scrolling
         if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) {
             flagUserInteraction();
         }
