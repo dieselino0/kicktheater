@@ -550,9 +550,9 @@ function generateBadgesHTML(messageData) {
     // --- STATE VARIABLES ---
     // userHasScrolledUp: Our primary source of truth. true = user has scrolled up, false = auto-scrolling.
     let userHasScrolledUp = false;
-    // EDIT: A flag to know if a scroll event was initiated by a user.
+    // A flag to know if a scroll event was initiated by a user.
     let isUserInteracting = false;
-    // EDIT: A timer to reset the user interaction flag after scrolling stops.
+    // A timer to reset the user interaction flag after scrolling stops.
     let interactionResetTimer;
 
     // --- CREATE THE "CHAT PAUSED" BUTTON ---
@@ -594,7 +594,6 @@ function generateBadgesHTML(messageData) {
      * @param {boolean} smooth - Whether to scroll smoothly or instantly.
      */
     function scrollToBottom(smooth = false) {
-        // Since this is not a user interaction, we don't set the flag.
         window.scrollTo({
             top: document.documentElement.scrollHeight,
             behavior: smooth ? 'smooth' : 'auto'
@@ -633,16 +632,27 @@ function generateBadgesHTML(messageData) {
     }
 
     /**
-     * EDIT: This is the primary function that runs on every scroll event.
+     * This is the primary function that runs on every scroll event.
      * It decides whether to pause or resume based on user interaction.
      */
     function handleScroll() {
         // Reset the timer every time a scroll event fires.
         clearTimeout(interactionResetTimer);
-        // Set a timer to reset the interaction flag. It will only run once scrolling has stopped.
+
+        // <<< CHANGE: The logic to RESUME the chat is now inside this timer's callback.
+        // This ensures we only check for resume conditions *after* the user has finished scrolling.
         interactionResetTimer = setTimeout(() => {
-            isUserInteracting = false;
+            isUserInteracting = false; // The user's scroll gesture is over.
+
+            // Now, check if we ended up at the bottom.
+            const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
+
+            // If we are at the bottom AND the chat was paused, resume.
+            if (isAtBottom && userHasScrolledUp) {
+                resumeChat();
+            }
         }, 150); // 150ms after the last scroll event, we assume the user is done.
+
 
         // If the scroll was not initiated by a user, do nothing.
         // This prevents our own scrollToBottom() from triggering a pause.
@@ -658,13 +668,9 @@ function generateBadgesHTML(messageData) {
         // A strict check for being at the very bottom.
         const isAtBottom = (window.innerHeight + Math.ceil(window.scrollY)) >= document.documentElement.scrollHeight;
 
-        if (isAtBottom) {
-            // User scrolled back to the bottom. Resume.
-            if (userHasScrolledUp) {
-                userHasScrolledUp = false;
-                pauseButton.style.display = 'none';
-            }
-        } else {
+        // <<< CHANGE: The 'scroll' handler is now ONLY responsible for PAUSING.
+        // The 'else' block that handled resuming has been removed from here.
+        if (!isAtBottom) {
             // User scrolled up. Pause.
             if (!userHasScrolledUp) {
                 userHasScrolledUp = true;
@@ -674,7 +680,7 @@ function generateBadgesHTML(messageData) {
     }
 
     /**
-     * EDIT: This function flags that a user has started a scroll action.
+     * This function flags that a user has started a scroll action.
      */
     function flagUserInteraction() {
         isUserInteracting = true;
