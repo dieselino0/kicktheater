@@ -44,7 +44,7 @@
     .fade {
         animation: fadeOut 0.5s ease-in forwards;
     }
-
+    
     /* --- GENERAL BODY & SCROLLBAR --- */
     body {
     margin: 0;
@@ -53,20 +53,10 @@
     overflow-x: hidden;
     overflow-y: auto;
     font-family: 'Share Tech Mono', 'Courier New', monospace;
-    background-color: #0A1419; /* Solid dark base color */
+    background-color: #111519;
     color: var(--text-color);
-
-    /* This creates the SUBTLE grid */
-    background-image:
-        linear-gradient(rgba(12, 255, 122, 0.1) 1px, transparent 1px),
-        linear-gradient(to right, rgba(12, 255, 122, 0.1) 1px, transparent 1px);
-    
-    background-size: 75px 75px; /* Larger squares for a slower perceived speed */
-    
-    /* This is where the magic happens! */
-    animation: scrollGrid 30s linear infinite;
     }
-    
+
     ::-webkit-scrollbar {
         width: 10px;
     }
@@ -155,15 +145,6 @@
     #loading {
         opacity: 0;
     }
-
-    @keyframes scrollGrid {
-    from {
-        background-position: 0 0;
-    }
-    to {
-        background-position: 75px 75px; /* Must match background-size for a seamless loop! */
-    }
-}
 </style>
 </head>
 <body>
