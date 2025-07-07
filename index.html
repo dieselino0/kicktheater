@@ -361,19 +361,6 @@ function handleMessage(messageData) {
     const username = messageData.sender.username;
     const timestamp = messageData.created_at;
 
-    // Optional: Hide messages that are commands
-    if (hideCommands === "true" && content.startsWith('!')) {
-        return;
-    }
-
-    // Optional: Hide messages from known bots
-    if (hideBots === 'true') {
-        const knownBots = ["livebot", "corardbot", 'botrixlive', "ryu7zbot", "botrix"];
-        if (knownBots.includes(username.toLowerCase())) {
-            return;
-        }
-    }
-
     // Replace Kick's custom emote tags with <img> elements
     content = content.replace(/\[emote:(\d+):.*?\]/g, (match, emoteId) => {
         return `<img src="https://files.kick.com/emotes/${emoteId}/fullsize" class="emote">`;
