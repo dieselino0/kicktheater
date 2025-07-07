@@ -54,19 +54,9 @@
     overflow-x: hidden;
     overflow-y: auto;
     font-family: 'Share Tech Mono', 'Courier New', monospace;
-    background-color: #0A1419; /* A solid dark background is best for this effect */
+    background-color: transparent; /* No texture, just clear */
     color: var(--text-color);
-
-    /* This creates the grid */
-    background-image:
-        linear-gradient(var(--accent-color) 1px, transparent 1px),
-        linear-gradient(to right, var(--accent-color) 1px, transparent 1px);
-    background-size: 40px 40px; /* Adjust size of grid squares here */
-    background-position: -1px -1px;
-    /* Add a faint glow to the grid lines */
-    background-blend-mode: screen;
-    /* Note: For this to look best, we set a solid bg color on the body itself. */
-    }
+}
 
     ::-webkit-scrollbar {
         width: 10px;
