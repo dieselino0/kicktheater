@@ -4,150 +4,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Chat Overlay</title>
     <style>
-        /* Animation */
-        @keyframes fadeInUp {
-            from {
-                transform: translate3d(0, 40px, 0)
-            }
+    /* --- FONTS & ANIMATIONS --- */
+    /* A clean, modern font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
 
-            to {
-                transform: translate3d(0, 0, 0);
-                opacity: 1
-            }
-        }
-			::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: black;
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: #777;
-  border-radius: 5px;}
-        .animate {
-            animation-duration: 0.3s;
-            animation-fill-mode: both;
-            -webkit-animation-duration: 0.3s;
-            -webkit-animation-fill-mode: both;
+    @keyframes fadeInUp {
+        from {
+            transform: translate3d(0, 20px, 0);
             opacity: 0;
-            animation-name: fadeInUp;
-            -webkit-animation-name: fadeInUp;
         }
-   body {
-  margin: 0;
-  height: 8500px;
-  position: relative;
-  overflow-x:hidden;
-  overflow-y:auto;
-}
-#loading
-{
-opacity:0;
-}
-        @-webkit-keyframes fadeInUp {
-            from {
-                transform: translate3d(0, 40px, 0)
-            }
-
-            to {
-                transform: translate3d(0, 0, 0);
-                opacity: 1
-            }
+        to {
+            transform: translate3d(0, 0, 0);
+            opacity: 1;
         }
+    }
+    .animate {
+        animation: fadeInUp 0.4s ease-out forwards;
+    }
 
-        .animate {
-            animation-duration: 0.3s;
-            animation-fill-mode: both;
-            -webkit-animation-duration: 0.3s;
-            -webkit-animation-fill-mode: both;
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+        }
+        to {
             opacity: 0;
-            animation-name: fadeInUp;
-            -webkit-animation-name: fadeInUp;
+            transform: scale(0.95);
         }
-
-        @keyframes fadeOut {
-            from {
-                opacity: 1
-            }
-
-            to {
-                opacity: 0
-            }
-        }
-
-        @-webkit-keyframes fadeOut {
-            from {
-                opacity: 1
-            }
-
-            to {
-                opacity: 0
-            }
-        }
-
-        .fade {
-            animation-duration: 0.5s;
-            animation-fill-mode: both;
-            -webkit-animation-duration: 0.5s;
-            -webkit-animation-fill-mode: both;
-            animation-name: fadeOut;
-            -webkit-animation-name: fadeOut;
-        }
+    }
+    .fade {
+        animation: fadeOut 0.5s ease-in forwards;
+    }
 
 
+    /* --- GENERAL BODY & SCROLLBAR --- */
+    body {
+        margin: 0;
+        height: 8500px; /* Kept from original */
+        position: relative;
+        overflow-x: hidden;
+        overflow-y: auto;
+        font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 16px; /* A more standard base size */
+        background-color: transparent; /* The page itself is clear */
+        color: #f0f0f0; /* Slightly softer than pure white */
+        text-shadow: 0 0 3px rgba(0, 0, 0, 0.7), 0 0 5px rgba(0, 0, 0, 0.5); /* KEY for readability */
+    }
 
-#chat-container {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 20px;
-  width: calc(100% - 20px);
-  padding: 10px;
-  position: absolute;
-  bottom: 0;
-  overflow: hidden; /* Enable vertical scrolling */
-  background-color: #111519;
-  color: white;
-  font-weight: 800;
-  word-break: break-word;
-}
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background-color: #555;
+        border-radius: 5px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: #777;
+    }
 
-        .chat_line {
-            line-height: 30px;
-        }
 
-        .user_info {
-            display: inline-block;
-        }
+    /* --- CHAT CONTAINER --- */
+    #chat-container {
+        box-sizing: border-box; /* Ensures padding is included in the width/height */
+        width: 100%;
+        padding: 10px;
+        position: absolute;
+        bottom: 0;
+        background-color: #111519;
+    }
 
-        .colon {
-            margin-right: 8px;
-        }
 
-        .emote {
-            max-width: 75px;
-            max-height: 25px;
-            margin-right: 4px;
-            vertical-align: middle;
-        }
+    /* --- INDIVIDUAL CHAT MESSAGE STYLING --- */
+    .chat_line {
+        line-height: 1.5; /* Use relative line-height for better scaling */
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        background-color: rgba(18, 18, 22, 0.85); /* Dark, semi-transparent background */
+        border-radius: 8px; /* Rounded corners for the "bubble" look */
+        word-wrap: break-word; /* Changed from break-word for better wrapping */
+        overflow-wrap: break-word;
+    }
 
-        .badge {
-            width: 16px;
-            height: 16px;
-            margin-right: 2px;
-            margin-bottom: 3px;
-            vertical-align: middle;
-            border-radius: 10%;
-        }
+    .user_info {
+        display: inline; /* Changed for better flow */
+        margin-right: 6px;
+        font-weight: 700; /* Make usernames bold */
+    }
 
-        img .emoji {
-            max-width: 75px !important;
-            max-height: 25px !important;
-            margin-right: 4px !important;
-            vertical-align: middle !important;
-        }
-    </style>
+    .username {
+        /* The color is set by JavaScript, so we just add weight here */
+        font-weight: 700;
+    }
+
+    .colon {
+        /* This is now handled by spacing, so we can hide it for a cleaner look */
+        display: none;
+    }
+
+    .message_content {
+        /* The main message text */
+    }
+
+
+    /* --- BADGES AND EMOTES --- */
+    .badge {
+        width: 18px;   /* Slightly larger */
+        height: 18px;  /* Slightly larger */
+        margin-right: 4px;
+        vertical-align: middle; /* Better alignment */
+        margin-bottom: 3px; /* Fine-tune vertical position */
+    }
+
+    .emote,
+    img.emoji { /* Target both custom emotes and emoji images */
+        height: 28px; /* Set a fixed height */
+        width: auto;  /* Let width adjust automatically to avoid squashing */
+        margin: 0 2px;
+        vertical-align: middle; /* Align with the middle of the text */
+    }
+
+    #loading {
+        opacity: 0;
+    }
+</style>
 </head>
 <body>
     <div id="chat-container">
