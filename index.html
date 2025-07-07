@@ -53,17 +53,18 @@
     overflow-x: hidden;
     overflow-y: auto;
     font-family: 'Share Tech Mono', 'Courier New', monospace;
-    background-color: #0A1419; /* The solid dark background */
+    background-color: #0A1419; /* Solid dark base color */
     color: var(--text-color);
 
     /* This creates the SUBTLE grid */
     background-image:
-        /* The Key Change: Using RGBA for transparency */
-        linear-gradient(rgba(12, 255, 122, 0.15) 1px, transparent 1px),
-        linear-gradient(to right, rgba(12, 255, 122, 0.15) 1px, transparent 1px);
+        linear-gradient(rgba(12, 255, 122, 0.1) 1px, transparent 1px),
+        linear-gradient(to right, rgba(12, 255, 122, 0.1) 1px, transparent 1px);
     
-    background-size: 50px 50px; /* Made squares slightly larger */
-    background-position: -1px -1px;
+    background-size: 75px 75px; /* Larger squares for a slower perceived speed */
+    
+    /* This is where the magic happens! */
+    animation: scrollGrid 30s linear infinite;
     }
     
     ::-webkit-scrollbar {
@@ -154,6 +155,15 @@
     #loading {
         opacity: 0;
     }
+
+    @keyframes scrollGrid {
+    from {
+        background-position: 0 0;
+    }
+    to {
+        background-position: 75px 75px; /* Must match background-size for a seamless loop! */
+    }
+}
 </style>
 </head>
 <body>
