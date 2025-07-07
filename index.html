@@ -53,15 +53,17 @@
     overflow-x: hidden;
     overflow-y: auto;
     font-family: 'Share Tech Mono', 'Courier New', monospace;
-    background-color: #0A1419; /* Solid dark base */
+    background-color: #0A1419; /* The solid dark background */
     color: var(--text-color);
 
-    /* A large, soft radial gradient from the bottom center */
-    background-image: radial-gradient(
-        ellipse at 50% 100%, /* Shape starts at the bottom-center */
-        rgba(12, 255, 122, 0.2) 0%, /* Faint glow at the source */
-        transparent 50% /* Fades to nothing halfway up the screen */
-    );
+    /* This creates the SUBTLE grid */
+    background-image:
+        /* The Key Change: Using RGBA for transparency */
+        linear-gradient(rgba(12, 255, 122, 0.15) 1px, transparent 1px),
+        linear-gradient(to right, rgba(12, 255, 122, 0.15) 1px, transparent 1px);
+    
+    background-size: 50px 50px; /* Made squares slightly larger */
+    background-position: -1px -1px;
     }
     
     ::-webkit-scrollbar {
