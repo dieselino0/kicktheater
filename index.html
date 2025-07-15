@@ -3,187 +3,149 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Chat Overlay</title>
-<style>
-/* --- FONTS & BASE VARIABLES --- */
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    <style>
+    /* --- FONTS, VARIABLES & ANIMATIONS --- */
+    /* Import a monospaced "tech" font */
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
-:root {
-  --bg-color: rgba(10, 20, 25, 0.85); /* Dark, cool background */
-  --accent-color: #0cff7a; /* Hacker green */
-  --accent-gradient: linear-gradient(90deg, #0cff7a, #00ffa2, #0cff7a); 
-  --text-color: #d6e2e6; /* Slightly softer white */
-  --glow-color: rgba(12, 255, 122, 0.5);
-  --glow-strong: 0 0 10px rgba(12, 255, 122, 0.8), 0 0 20px rgba(12, 255, 122, 0.5);
-}
+    /* Define theme colors for easy customization */
+    :root {
+        --bg-color: rgba(10, 20, 25, 0.85); /* Dark, cool background */
+        --accent-color: #0cff7a;            /* Vibrant "hacker" green */
+        --text-color: #e0e0e0;              /* Soft white/gray text */
+        --glow-color: rgba(12, 255, 122, 0.5); /* Glow effect for the accent */
+    }
 
-/* --- ANIMATIONS --- */
-@keyframes fadeInUp {
-  0% {
-    opacity: 0;
-    transform: translateY(15px);
-    filter: blur(4px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
-  }
-}
-.animate {
-  animation: fadeInUp 0.4s ease-out forwards;
-}
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 20px, 0);
+            filter: blur(3px);
+        }
+        to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+            filter: blur(0);
+        }
+    }
+    .animate {
+        animation: fadeInUp 0.4s cubic-bezier(0.215, 0.610, 0.355, 1.000) forwards;
+    }
 
-@keyframes glowPulse {
-  0% {
-    text-shadow: 0 0 3px var(--accent-color), 0 0 6px var(--glow-color);
-  }
-  50% {
-    text-shadow: 0 0 6px var(--accent-color), 0 0 12px var(--glow-color);
-  }
-  100% {
-    text-shadow: 0 0 3px var(--accent-color), 0 0 6px var(--glow-color);
-  }
-}
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+        }
+        to {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+    }
+    .fade {
+        animation: fadeOut 0.5s ease-in forwards;
+    }
+    
+    /* --- GENERAL BODY & SCROLLBAR --- */
+    body {
+    margin: 0;
+    height: 8500px;
+    position: relative;
+    overflow-x: hidden;
+    overflow-y: auto;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    background-color: #111519;
+    color: var(--text-color);
+    }
 
-@keyframes scanline {
-  0% {
-    opacity: 0.1;
-    transform: translateY(-100%);
-  }
-  100% {
-    opacity: 0.1;
-    transform: translateY(100%);
-  }
-}
+    ::-webkit-scrollbar {
+        width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+    }
+    ::-webkit-scrollbar-thumb {
+        background-color: var(--accent-color);
+        border-radius: 0; /* Sharp corners */
+        box-shadow: 0 0 10px var(--glow-color);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: #fff;
+    }
 
-/* --- GLOBAL BODY --- */
-body {
-  margin: 0;
-  height: 8500px;
-  position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
-  font-family: 'Share Tech Mono', 'Courier New', monospace;
-  background: radial-gradient(ellipse at center, #0a0f14 0%, #05080a 100%);
-  color: var(--text-color);
-  
-  /* Subtle texture effect */
-  background-image: repeating-linear-gradient(
-    rgba(255, 255, 255, 0.01) 0 2px,
-    transparent 2px 4px
-  );
-}
 
-/* Optional: a faint scanline overlay */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.015),
-    rgba(255,255,255,0.015) 1px,
-    transparent 2px
-  );
-  animation: scanline 3s linear infinite;
-}
+    /* --- CHAT CONTAINER --- */
+    #chat-container {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 10px;
+        position: absolute;
+        bottom: 0;
+        text-shadow: 0 0 5px rgba(0, 0, 0, 0.8); /* Basic readability shadow */
+        background-color: #111519;
+    }
 
-/* --- SCROLLBAR --- */
-::-webkit-scrollbar {
-  width: 10px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--accent-color);
-  box-shadow: 0 0 10px var(--glow-color);
-  transition: 0.3s ease;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #fff;
-  box-shadow: var(--glow-strong);
-}
+    /* --- INDIVIDUAL CHAT MESSAGE STYLING (THE CORE OF THE LOOK) --- */
+    .chat_line {
+        padding: 8px 15px;
+        margin-bottom: 8px;
+        background-color: var(--bg-color);
+        border-left: 3px solid var(--accent-color);
+        line-height: 1.6;
+        overflow-wrap: break-word;
+        box-shadow: inset 0 0 15px rgba(0,0,0,0.5), 0 0 5px rgba(0,0,0,0.3);
+        
+        /* This creates the sharp, cut-off corner effect */
+        clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+    }
 
-/* --- CHAT CONTAINER --- */
-#chat-container {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 15px 20px;
-  position: absolute;
-  bottom: 0;
-  background: rgba(10, 15, 18, 0.85);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
+    .user_info {
+        display: inline;
+        margin-right: 8px;
+    }
 
-/* --- INDIVIDUAL CHAT MESSAGES --- */
-.chat_line {
-  padding: 12px 18px;
-  margin-bottom: 10px;
-  background: var(--bg-color);
-  border-left: 3px solid var(--accent-color);
-  line-height: 1.6;
-  overflow-wrap: break-word;
-  box-shadow: inset 0 0 15px rgba(0,0,0,0.6),
-              0 0 8px rgba(0,0,0,0.3);
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+    .username {
+        /* Use !important to override the inline style from JS */
+        font-weight: normal; /* Font is already bold-looking */
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        filter: brightness(1.2);
+        text-shadow: 0 0 5px currentColor;
+    }
 
-/* Slight hover pop effect */
-.chat_line:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 10px var(--glow-color), 0 0 20px rgba(0,0,0,0.4);
-}
+    .colon {
+        /* Hide the colon for a cleaner, modern terminal look */
+        display: none;
+    }
 
-/* --- USERNAME --- */
-.username {
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  filter: brightness(1.2);
-  animation: glowPulse 2s infinite alternate;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  color: transparent;
-}
+    .message_content {
+        /* Text color is inherited from body */
+    }
 
-/* Hide colon for clean look */
-.colon {
-  display: none;
-}
 
-/* --- BADGES --- */
-.badge {
-  width: 20px;
-  height: 20px;
-  margin-right: 6px;
-  vertical-align: middle;
-  margin-bottom: 4px;
-  filter: drop-shadow(0 0 3px var(--accent-color));
-}
+    /* --- BADGES AND EMOTES --- */
+    .badge {
+        width: 18px;
+        height: 18px;
+        margin-right: 5px;
+        vertical-align: middle;
+        margin-bottom: 4px;
+        /* Make badges glow to match the theme */
+        filter: drop-shadow(0 0 3px var(--accent-color));
+        border-radius: 0; /* Sharp corners on badge images if possible */
+    }
 
-/* --- EMOTES --- */
-.emote, img.emoji {
-  height: 32px;
-  width: auto;
-  margin: -4px 3px;
-  vertical-align: middle;
-  transition: transform 0.2s ease;
-}
-.emote:hover, img.emoji:hover {
-  transform: scale(1.2);
-  filter: drop-shadow(0 0 8px var(--glow-color));
-}
+    .emote,
+    img.emoji {
+        height: 30px; /* Slightly larger for clarity */
+        width: auto;
+        margin: -4px 2px; /* Adjust margin to better align with text */
+        vertical-align: middle;
+    }
 
-/* --- LOADING STATE --- */
-#loading {
-  opacity: 0;
-}
+    #loading {
+        opacity: 0;
+    }
 </style>
-
 </head>
 <body>
     <div id="chat-container">
