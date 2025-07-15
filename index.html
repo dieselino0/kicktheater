@@ -84,25 +84,18 @@
         background-color: #111519;
     }
 
-
     /* --- INDIVIDUAL CHAT MESSAGE STYLING (THE CORE OF THE LOOK) --- */
     .chat_line {
         padding: 8px 15px;
         margin-bottom: 8px;
-        /* Use a subtle gradient instead of a flat color */
-        background: linear-gradient(to right, var(--bg-color) 80%, rgba(10, 20, 25, 0.5));
+        background-color: var(--bg-color);
         border-left: 3px solid var(--accent-color);
         line-height: 1.6;
         overflow-wrap: break-word;
         box-shadow: inset 0 0 15px rgba(0,0,0,0.5), 0 0 5px rgba(0,0,0,0.3);
+        
+        /* This creates the sharp, cut-off corner effect */
         clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
-        position: relative; /* Needed for the timestamp */
-        transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .chat_line:hover {
-        transform: translateX(5px);
-        box-shadow: inset 0 0 15px rgba(0,0,0,0.3), 0 0 10px var(--glow-color);
     }
 
     .user_info {
