@@ -120,6 +120,17 @@
         /* Text color is inherited from body */
     }
 
+    /* --- NEW: STYLES FOR COMMANDS --- */
+    .chat_line.command-message {
+        border-left-color: #ffc700; /* A gold/yellow color for commands */
+    }
+
+    .chat_line.command-message .message_content {
+        color: #ffc700;
+        font-style: italic;
+    }
+    /* --- END NEW STYLES --- */
+
 
     /* --- BADGES AND EMOTES --- */
     .badge {
@@ -421,6 +432,12 @@ function handleMessage(messageData) {
     if (animate) {
         lineElement.classList.add("animate");
     }
+
+    // --- NEW: Check if the message is a command and apply the class ---
+    if (content.trim().startsWith('!')) {
+        lineElement.classList.add('command-message');
+    }
+    // --- END NEW CODE ---
 
     // Set up fade-out if specified
     if (fade) {
